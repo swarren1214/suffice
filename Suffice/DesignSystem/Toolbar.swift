@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// The glass month capsule at the top left of every tab: the logo and the month. It opens a
+/// The glass month capsule at the top left of every tab: a calendar icon, the month and a chevron. It opens a
 /// small glass popover with the months of a year as a 3×4 grid of short names, and the years
 /// underneath. Picking a year changes the grid; picking a month goes there. Months after this
 /// one are disabled, since there's nothing to budget there yet.
@@ -12,7 +12,8 @@ struct MonthMenu: View {
     var body: some View {
         Button { isPresented = true } label: {
             HStack(spacing: 8) {
-                BrandMark.image(width: 22)
+                Image(systemName: "calendar")
+                    .font(.callout.weight(.semibold))
                 Text(router.month.start.formatted(.dateTime.month(.wide).year()))
                     .font(.callout.weight(.semibold))
                 Image(systemName: "chevron.down")
