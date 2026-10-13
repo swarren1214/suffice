@@ -1,0 +1,244 @@
+import SwiftData
+import SwiftUI
+import UniformTypeIdentifiers
+
+/// Profile › Household: the people in the budget.
+struct HouseholdView: View {
+    @Query(sort: \Member.sortOrder) private var members: [Member]
+    @AppStorage(SettingsKey.currentMember) private var currentMember = ""
+    @State private var editing: Member?
+    @State private var showsNew = false
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(members) { member in
+                    Button { editing = member } label: {
+                        HStack(spacing: 12) {
+                            MemberBadge(member: member, size: 32)
+                            Text(member.name).foregroundStyle(.primary)
+                            Spacer()
+                            if member.id.uuidString == currentMember {
+                                Text("This iPhone").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                Button("Add Person", systemImage: "person.badge.plus") { showsNew = true }
+            } footer: {
+                Text("Everyone here shows up on the transactions they make. Sharing one budget across two Apple Accounts comes with iCloud sharing.")
+            }
+        }
+        .navigationTitle("Household")
+        .sheet(item: $editing) { member in
+            MemberEditor(member: member)
+        }
+        .sheet(isPresented: $showsNew) {
+            MemberEditor(member: nil)
+        }
+    }
+}
+
+/// Add, rename, recolor or remove a person.
+struct MemberEditor: View {
+    let member: Member?
+    /// Opened from Profile › My info: saving makes this person "me".
+    var isMe: Bool
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @Query(sort: \Member.sortOrder) private var members: [Member]
+    @AppStorage(SettingsKey.currentMember) private var currentMember = ""
+    @State private var name = ""
+    @State private var color: MemberColor = .green
+    @State private var photo: Data?
+    @State private var isThisPhone = false
+    @State private var originalName = ""
+    @State private var pendingDelete = false
+
+    init(member: Member?, isMe: Bool = false) {
+        self.member = member
+        self.isMe = isMe
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack(spacing: 14) {
+                        PhotoPickerAvatar(name: name, color: color, photo: $photo, size: 56)
+                        TextField("Name", text: $name)
+                            .font(.title3)
+                            .textInputAutocapitalization(.words)
+                    }
+                    if !isMe {
+                        Toggle("This is me", isOn: $isThisPhone)
+                    }
+                } footer: {
+                    Text("Tap the picture to add a photo. The person who uses this iPhone is filled in on new transactions.")
+                }
+                Section("Color") {
+                    HStack(spacing: 0) {
+                        ForEach(MemberColor.allCases) { option in
+                            Button { color = option } label: {
+                                Text(name.first.map { String($0).uppercased() } ?? "A")
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundStyle(option.ink)
+                                    .frame(width: 36, height: 36)
+                                    .background(option.background, in: .circle)
+                                    .padding(3)
+                                    .overlay(Circle().strokeBorder(option == color ? option.ink : .clear, lineWidth: 2))
+                            }
+                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity)
+                            .accessibilityLabel(option.name)
+                            .accessibilityAddTraits(option == color ? .isSelected : [])
+                        }
+                    }
+                }
+                if member != nil {
+                    Section {
+                        Button("Remove \(originalName)", role: .destructive) {
+                            pendingDelete = true
+                            dismiss()
+                        }
+                    } footer: {
+                        Text("Their past transactions stay in Activity.")
+                    }
+                }
+            }
+            .navigationTitle(member == nil ? "Add Person" : (isMe ? "My info" : "Edit Person"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", systemImage: "xmark") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", systemImage: "checkmark", role: .confirm) { save() }
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .onAppear {
+                if let member {
+                    name = member.name
+                    originalName = member.name
+                    color = member.color
+                    photo = member.photoData
+                    isThisPhone = currentMember == member.id.uuidString
+                } else {
+                    // Suggest a color nobody has yet.
+                    let used = Set(members.map(\.color))
+                    color = MemberColor.allCases.first { !used.contains($0) } ?? .green
+                    isThisPhone = isMe || members.isEmpty
+                }
+            }
+            .onDisappear {
+                guard pendingDelete, let member else { return }
+                if currentMember == member.id.uuidString { currentMember = "" }
+                context.delete(member)
+                try? context.save()
+            }
+        }
+    }
+
+    private func save() {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        let target: Member
+        if let member {
+            target = member
+            target.name = trimmed
+            target.color = color
+            if target.photoData != photo { target.photoData = photo }
+        } else {
+            target = Member(name: trimmed, color: color, photoData: photo, sortOrder: (members.map(\.sortOrder).max() ?? -1) + 1)
+            context.insert(target)
+        }
+        try? context.save()
+        if isMe || isThisPhone {
+            currentMember = target.id.uuidString
+        } else if currentMember == target.id.uuidString {
+            currentMember = ""
+        }
+        dismiss()
+    }
+}
+
+/// Profile › Connected accounts.
+struct AccountsListView: View {
+    @Query(sort: \Account.sortOrder) private var accounts: [Account]
+    @Query private var entries: [LedgerEntry]
+    @State private var editing: Account?
+    @State private var showsConnect = false
+
+    var body: some View {
+        let records = entries.map(\.record)
+        List {
+            Section {
+                ForEach(accounts) { account in
+                    Button { editing = account } label: {
+                        HStack(spacing: 12) {
+                            InstitutionLogo(name: account.institution.isEmpty ? account.name : account.institution, colorHex: account.colorHex, isCard: account.kind == .credit, size: 34)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(account.displayName).foregroundStyle(.primary)
+                                Text("\(account.kind.name) · \(account.source.label)\(account.includeInBudget ? "" : " · Hidden")")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(Money.text(BudgetMath.balance(of: account.record, entries: records)))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                    }
+                }
+                Button("Add Account", systemImage: "plus") { showsConnect = true }
+            }
+        }
+        .navigationTitle("Connected accounts")
+        .sheet(item: $editing) { account in
+            AccountEditor(account: account)
+        }
+        .sheet(isPresented: $showsConnect) {
+            ConnectView(step: nil) { showsConnect = false }
+        }
+    }
+}
+
+/// Profile › About Suffice: version, where the data lives, export, credits.
+struct AboutView: View {
+    @Environment(\.modelContext) private var context
+    @State private var csv = ""
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("Version", value: AppConfig.version)
+                LabeledContent("Data", value: AppConfig.cloudSyncEnabled ? "Your iCloud" : "This iPhone")
+                ShareLink(item: CSVExport(text: csv), preview: SharePreview("Suffice transactions")) {
+                    Label("Export Transactions as CSV", systemImage: "square.and.arrow.up")
+                }
+            } footer: {
+                Text("Your budget lives on this iPhone and in your private iCloud. Suffice has no servers and can't see your data.")
+            }
+            Section {
+                Text("Suffice is part of a family of apps with Sated and Hearken: simple tools for running a life, with your data kept in your own iCloud.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("About Suffice")
+        .onAppear { csv = Ledger.csv(in: context) }
+    }
+}
+
+/// The transactions as a .csv file for the share sheet.
+nonisolated struct CSVExport: Transferable {
+    var text: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(exportedContentType: .commaSeparatedText) { export in
+            Data(export.text.utf8)
+        }
+        .suggestedFileName("Suffice Transactions.csv")
+    }
+}
