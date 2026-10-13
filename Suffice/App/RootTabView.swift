@@ -13,20 +13,28 @@ struct RootTabView: View {
     var body: some View {
         @Bindable var router = router
         TabView(selection: $router.tab) {
-            Tab("Overview", systemImage: "square.grid.2x2", value: AppTab.overview) {
+            Tab(value: AppTab.overview) {
                 NavigationStack { OverviewView() }
+            } label: {
+                tabIcon("Overview", "square.grid.2x2")
             }
 
-            Tab("Activity", systemImage: "creditcard", value: AppTab.activity) {
+            Tab(value: AppTab.activity) {
                 NavigationStack { ActivityView() }
+            } label: {
+                tabIcon("Activity", "creditcard")
             }
 
-            Tab("Budget", systemImage: "chart.pie", value: AppTab.budget) {
+            Tab(value: AppTab.budget) {
                 NavigationStack { BudgetView() }
+            } label: {
+                tabIcon("Budget", "chart.pie")
             }
 
-            Tab("Bills", systemImage: "calendar.badge.clock", value: AppTab.bills) {
+            Tab(value: AppTab.bills) {
                 NavigationStack { BillsView() }
+            } label: {
+                tabIcon("Bills", "calendar.badge.clock")
             }
 
             Tab(value: AppTab.search, role: .search) {
@@ -37,6 +45,12 @@ struct RootTabView: View {
         }
         .tabViewSearchActivation(.searchTabSelection)
         .tabBarMinimizeBehavior(.onScrollDown)
+    }
+
+    /// Icon only in the tab bar; the name is still what VoiceOver reads.
+    private func tabIcon(_ title: String, _ systemImage: String) -> some View {
+        Image(systemName: systemImage)
+            .accessibilityLabel(title)
     }
 }
 
