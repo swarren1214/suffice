@@ -342,8 +342,6 @@ struct BudgetSheet: View {
             if isOpen {
                 Divider().padding(.leading, 60)
                 entryList(entries, lookup: lookup)
-                    .padding(.leading, 12)
-                    .background(Color(.tertiarySystemFill).opacity(0.35))
             }
         }
     }
