@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Keys for settings stored with @AppStorage. Keep every key here so views stay in sync.
 nonisolated enum SettingsKey {
@@ -31,7 +32,13 @@ nonisolated enum Brand {
     static let greenInk = Color(hex: 0x035F1C)
     /// Spending pills and "Spent" figures.
     static let expense = Color(hex: 0xD9343A)
-    static let expenseInk = Color(hex: 0xC21F1F)
+    /// Red text and icons: deep red on light backgrounds, a lighter coral in dark mode, where
+    /// the deep red is too dim to read.
+    static let expenseInk = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 1, green: 0x6B / 255, blue: 0x6B / 255, alpha: 1)
+            : UIColor(red: 0xC2 / 255, green: 0x1F / 255, blue: 0x1F / 255, alpha: 1)
+    })
     /// The Total cash card.
     static let cashStart = Color(hex: 0x5A3FD9)
     static let cashEnd = Color(hex: 0x2563C9)

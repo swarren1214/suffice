@@ -22,6 +22,10 @@ struct AccountEditor: View {
     @State private var pendingDelete = false
     /// The balance shown when the editor opened, to tell whether it was changed.
     @State private var loadedCents = 0
+    /// Whether the balance was typed over (it's shown as currency, edited as a plain number).
+    @State private var balanceEdited = false
+    @State private var balanceAtFocus = ""
+    @FocusState private var balanceFocused: Bool
 
     static let colors: [Int] = [0x0E3E8C, 0xC8102E, 0x00843D, 0x5B3FD9, 0xC25E00, 0x1C1C1E]
 
@@ -39,7 +43,7 @@ struct AccountEditor: View {
             Form {
                 Section {
                     HStack(spacing: 14) {
-                        InstitutionLogo(name: institution.isEmpty ? name : institution, colorHex: colorHex, isCard: kind == .credit, size: 48)
+                        InstitutionLogo(name: institution.isEmpty ? name : institution, colorHex: colorHex, isCard: kind == .credit, size: 48, domain: account?.institutionDomain)
                         VStack(alignment: .leading, spacing: 0) {
                             TextField("Bank", text: $institution)
                                 .font(.title3.weight(.semibold))
@@ -62,6 +66,18 @@ struct AccountEditor: View {
                             .accessibilityLabel("Color \(Self.colors.firstIndex(of: hex).map { $0 + 1 } ?? 1)")
                             .accessibilityAddTraits(hex == colorHex ? .isSelected : [])
                         }
+                        // Any other color: the system picker, starting from the current one.
+                        ColorPicker("Custom color", selection: customColor, supportsOpacity: false)
+                            .labelsHidden()
+                            .frame(width: 36, height: 36)
+                            .overlay(
+                                Circle()
+                                    .strokeBorder(isCustomColor ? Color(hex: UInt32(colorHex)) : .clear, lineWidth: 2)
+                                    .frame(width: 42, height: 42)
+                                    .allowsHitTesting(false)
+                            )
+                            .accessibilityLabel("Custom color")
+                            .accessibilityAddTraits(isCustomColor ? .isSelected : [])
                     }
                 }
 
@@ -80,10 +96,22 @@ struct AccountEditor: View {
                             }
                     }
                     LabeledContent(kind == .credit ? "Balance owed" : "Balance today") {
-                        TextField("$0", text: $balanceText)
+                        TextField(Money.text(0), text: $balanceText)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .monospacedDigit()
+                            .focused($balanceFocused)
+                            .onChange(of: balanceFocused) { _, focused in
+                                if focused {
+                                    // Plain digits while typing…
+                                    balanceAtFocus = Money.editable(balanceCents)
+                                    balanceText = balanceAtFocus
+                                } else {
+                                    // …and currency again after.
+                                    if balanceText != balanceAtFocus { balanceEdited = true }
+                                    balanceText = Money.text(balanceCents)
+                                }
+                            }
                     }
                     Toggle("Include in budget", isOn: $includeInBudget)
                 } footer: {
@@ -92,8 +120,19 @@ struct AccountEditor: View {
 
                 if account != nil {
                     Section {
-                        Button("Delete Account", role: .destructive) { confirmsDelete = true }
+                        Button(role: .destructive) { confirmsDelete = true } label: {
+                            Label("Remove Account", systemImage: "xmark")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Brand.expenseInk)
+                                .frame(maxWidth: .infinity)
+                                .frame(minHeight: 40)
+                        }
+                        .buttonStyle(.glass)
+                        .controlSize(.large)
+                        .tint(Brand.expenseInk)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 }
             }
             .navigationTitle(account == nil ? "New Account" : "Account")
@@ -107,13 +146,17 @@ struct AccountEditor: View {
                         .disabled(!isValid)
                 }
             }
-            .confirmationDialog("Delete this account?", isPresented: $confirmsDelete, titleVisibility: .visible) {
-                Button("Delete Account", role: .destructive) {
+            .confirmationDialog("Remove this account?", isPresented: $confirmsDelete, titleVisibility: .visible) {
+                Button("Remove Account", role: .destructive) {
                     pendingDelete = true
                     dismiss()
                 }
             } message: {
-                Text("Its transactions stay in Activity.")
+                if account?.source == .plaid {
+                    Text("Its transactions stay in Activity. It comes back the next time its bank syncs; to stop that, disconnect the bank in Connected accounts, or turn off Include in budget instead.")
+                } else {
+                    Text("Its transactions stay in Activity.")
+                }
             }
             .onAppear(perform: load)
             .onDisappear {
@@ -132,13 +175,31 @@ struct AccountEditor: View {
         kind = account.kind
         let entries = (try? context.fetch(FetchDescriptor<LedgerEntry>())) ?? []
         loadedCents = BudgetMath.balance(of: account.record, entries: entries.map(\.record))
-        balanceText = Money.editable(loadedCents)
+        balanceText = Money.text(loadedCents)
         includeInBudget = account.includeInBudget
         colorHex = account.colorHex
     }
 
+    /// The balance as it stands in the field: what was loaded until it's typed over.
+    private var balanceCents: Int {
+        let typing = balanceFocused && balanceText != balanceAtFocus
+        guard account == nil || balanceEdited || typing else { return loadedCents }
+        return Money.cents(from: balanceText) ?? 0
+    }
+
+    private var isCustomColor: Bool { !Self.colors.contains(colorHex) }
+
+    private var customColor: Binding<Color> {
+        Binding(
+            get: { Color(hex: UInt32(truncatingIfNeeded: colorHex)) },
+            set: { newValue in
+                if let hex = newValue.hexValue { colorHex = Int(hex) }
+            }
+        )
+    }
+
     private func save() {
-        let cents = Money.cents(from: balanceText) ?? 0
+        let cents = balanceCents
         let target: Account
         if let account {
             target = account

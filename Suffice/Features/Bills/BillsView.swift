@@ -151,7 +151,7 @@ private struct MonthBills: View {
 
     private func laterText(_ bill: Bill) -> String {
         guard let next = BudgetMath.nextDue(of: bill.record, onOrAfter: month.end) else { return "No more due dates" }
-        return "\(Money.text(bill.amountCents)) · next \(DateLabel.short(next))"
+        return "\(bill.amountLabel) · next \(DateLabel.short(next))"
     }
 
     private var currentMemberID: UUID? {
@@ -162,6 +162,10 @@ private struct MonthBills: View {
         withAnimation(.snappy) {
             if due.state.isPaid {
                 Ledger.unpay(due.bill, dueOn: due.date, context: context)
+            } else if due.bill.isVariable {
+                // A variable bill's amount isn't known ahead: open the payment to fill it in,
+                // starting from the average.
+                differentAmount = DraftItem(draft: Ledger.paymentDraft(for: due.bill, dueOn: due.date, memberID: currentMemberID))
             } else {
                 _ = Ledger.pay(due.bill, dueOn: due.date, memberID: currentMemberID, in: context)
             }
@@ -262,7 +266,7 @@ private struct BillRow: View {
     }
 
     private var detail: String {
-        var parts = [Money.text(bill.amountCents), dueDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())]
+        var parts = [bill.amountLabel, dueDate.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())]
         if case .overdue(let days) = state { parts.append(days == 1 ? "1 day late" : "\(days) days late") }
         if bill.frequency != .monthly || bill.interval > 1 {
             parts.append(BudgetMath.scheduleText(bill.record))

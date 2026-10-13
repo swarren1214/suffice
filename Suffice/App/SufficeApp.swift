@@ -28,6 +28,7 @@ struct SufficeApp: App {
     var body: some Scene {
         WindowGroup {
             AppRoot()
+                .background(KeyboardDismissal().frame(width: 0, height: 0))
                 .task { await LifestyleAPI.shared.prepareSession() }
                 .environment(router)
                 .environment(lock)

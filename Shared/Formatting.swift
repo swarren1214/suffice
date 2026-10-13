@@ -31,6 +31,11 @@ nonisolated enum Money {
         return NSDecimalNumber(decimal: rounded).intValue
     }
 
+    /// An amount field's resting text: "$1,250.00", or "" for zero so its placeholder shows.
+    static func field(_ cents: Int) -> String {
+        cents == 0 ? "" : text(cents)
+    }
+
     /// The editable form of an amount: "12.50", or "" for zero.
     static func editable(_ cents: Int) -> String {
         guard cents != 0 else { return "" }

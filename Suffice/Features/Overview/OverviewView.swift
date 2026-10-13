@@ -128,7 +128,7 @@ private struct InstitutionRow: View {
                 }
             } label: {
                 HStack(spacing: 12) {
-                    InstitutionLogo(name: group.name, colorHex: first?.colorHex ?? 0x0E3E8C, isCard: isCredit)
+                    InstitutionLogo(name: group.name, colorHex: first?.colorHex ?? 0x0E3E8C, isCard: isCredit, domain: group.accounts.lazy.compactMap(\.institutionDomain).first)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(group.name)
                             .font(.body.weight(.semibold))
@@ -147,7 +147,7 @@ private struct InstitutionRow: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.vertical, 14)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
@@ -161,7 +161,7 @@ private struct InstitutionRow: View {
                 }
                 .padding(.leading, 68)
                 .padding(.trailing, 16)
-                .padding(.bottom, 6)
+                .padding(.bottom, 4)
             }
         }
     }
@@ -181,12 +181,13 @@ private struct SubAccountRow: View {
     var body: some View {
         VStack(spacing: 0) {
             Divider()
-            HStack {
+            HStack(spacing: 16) {
                 Button(action: edit) {
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(account.name.isEmpty ? account.kind.name : account.name)
                             .font(.subheadline)
                             .foregroundStyle(.primary)
+                            .lineLimit(2)
                         Text(detail)
                             .font(.caption)
                             .foregroundStyle(Brand.secondaryText)
@@ -198,7 +199,8 @@ private struct SubAccountRow: View {
                 Toggle("Include \(account.name) in budget", isOn: $account.includeInBudget)
                     .labelsHidden()
             }
-            .frame(minHeight: 50)
+            .padding(.vertical, 14)
+            .frame(minHeight: 60)
         }
     }
 
@@ -214,8 +216,22 @@ struct InstitutionLogo: View {
     var colorHex: Int
     var isCard = false
     var size: CGFloat = 40
+    /// The bank's website domain when known (Plaid); otherwise it's matched by name.
+    var domain: String? = nil
 
     var body: some View {
+        mark
+            // The bank's logo from Logo.dev over the initial, once it loads. Banks Logo.dev
+            // doesn't know keep the initial.
+            .overlay {
+                if let url = BankLogo.url(name: name, domain: domain) {
+                    MerchantLogoImage(url: url, size: size)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+
+    private var mark: some View {
         Group {
             if isCard {
                 Image(systemName: "creditcard")

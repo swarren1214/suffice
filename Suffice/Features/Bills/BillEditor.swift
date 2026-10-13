@@ -12,6 +12,10 @@ struct BillEditor: View {
 
     @State private var name = ""
     @State private var amountText = ""
+    @State private var isVariable = false
+    @State private var minText = ""
+    @State private var maxText = ""
+    @FocusState private var focusedAmount: AmountField?
     @State private var frequency: BillFrequency = .monthly
     @State private var interval = 1
     @State private var firstDue = Calendar.current.startOfDay(for: .now)
@@ -29,6 +33,21 @@ struct BillEditor: View {
 
     init(bill: Bill?) {
         self.bill = bill
+    }
+
+    private enum AmountField { case amount, minimum, maximum }
+
+    private var amountCents: Int { Money.cents(from: amountText) ?? 0 }
+    private var minCents: Int? { Money.cents(from: minText).flatMap { $0 > 0 ? $0 : nil } }
+    private var maxCents: Int? { Money.cents(from: maxText).flatMap { $0 > 0 ? $0 : nil } }
+
+    /// What's wrong with a variable bill's range, if anything.
+    private var rangeProblem: String? {
+        guard isVariable else { return nil }
+        if let low = minCents, let high = maxCents, low > high { return "The minimum is more than the maximum." }
+        if let low = minCents, amountCents > 0, low > amountCents { return "The minimum is more than the average." }
+        if let high = maxCents, amountCents > 0, high < amountCents { return "The maximum is less than the average." }
+        return nil
     }
 
     /// The common schedules, as in Calendar's Repeat menu.
@@ -102,7 +121,7 @@ struct BillEditor: View {
     }
 
     private var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty && (Money.cents(from: amountText) ?? 0) > 0
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && amountCents > 0 && rangeProblem == nil
     }
 
     var body: some View {
@@ -120,11 +139,17 @@ struct BillEditor: View {
                             .font(.title3.weight(.semibold))
                             .textInputAutocapitalization(.words)
                     }
-                    LabeledContent("Amount") {
-                        TextField("$0.00", text: $amountText)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                            .monospacedDigit()
+                    Toggle("Variable amount", isOn: $isVariable.animation(.snappy))
+                    amountField(isVariable ? "Average" : "Amount", text: $amountText, field: .amount, placeholder: "$0.00")
+                    if isVariable {
+                        amountField("Minimum", text: $minText, field: .minimum, placeholder: "Optional")
+                        amountField("Maximum", text: $maxText, field: .maximum, placeholder: "Optional")
+                    }
+                } footer: {
+                    if let rangeProblem {
+                        Text(rangeProblem).foregroundStyle(Brand.expenseInk)
+                    } else if isVariable {
+                        Text("For bills that change, like utilities. Totals count the average, and Mark paid asks for the actual amount.")
                     }
                 }
 
@@ -210,10 +235,24 @@ struct BillEditor: View {
         }
     }
 
+    private func amountField(_ title: String, text: Binding<String>, field: AmountField, placeholder: String) -> some View {
+        LabeledContent(title) {
+            TextField(placeholder, text: text)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .monospacedDigit()
+                .focused($focusedAmount, equals: field)
+                .currencyEditing(text, isFocused: focusedAmount == field)
+        }
+    }
+
     private func load() {
         guard let bill else { return }
         name = bill.name
-        amountText = Money.editable(bill.amountCents)
+        amountText = Money.field(bill.amountCents)
+        isVariable = bill.isVariable
+        minText = Money.field(bill.minCents ?? 0)
+        maxText = Money.field(bill.maxCents ?? 0)
         frequency = bill.frequency
         interval = max(bill.interval, 1)
         isCustom = Preset.matching(frequency, interval) == nil
@@ -236,7 +275,7 @@ struct BillEditor: View {
 
     private func save() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        let cents = Money.cents(from: amountText) ?? 0
+        let cents = amountCents
         let target: Bill
         if let bill {
             target = bill
@@ -246,6 +285,9 @@ struct BillEditor: View {
         }
         target.name = trimmed
         target.amountCents = cents
+        target.isVariable = isVariable
+        target.minCents = isVariable ? minCents : nil
+        target.maxCents = isVariable ? maxCents : nil
         let calendar = Calendar.current
         target.dueDay = calendar.component(.day, from: firstDue)
         target.startDate = calendar.startOfDay(for: firstDue)

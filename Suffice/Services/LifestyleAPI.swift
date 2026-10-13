@@ -330,6 +330,8 @@ nonisolated struct BankTransaction: Decodable, Sendable {
     /// The merchant's website domain ("target.com"), for Logo.dev.
     let merchantDomain: String?
     let city: String?
+    /// The street address, when the bank has one.
+    let address: String?
     let latitude: Double?
     let longitude: Double?
 }
@@ -337,6 +339,8 @@ nonisolated struct BankTransaction: Decodable, Sendable {
 nonisolated struct NewBankConnection: Decodable, Sendable {
     let itemId: String
     let institution: String
+    /// The bank's website domain, for its logo (nil from older API versions).
+    let institutionDomain: String?
     let accounts: [BankAccount]
 }
 

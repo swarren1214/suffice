@@ -106,6 +106,9 @@ final class LedgerEntry {
     var latitude: Double?
     var longitude: Double?
     var placeName: String?
+    /// The street address from the bank ("123 Main St, Lehi, UT 84043"), looked up once for the
+    /// map when the bank didn't send coordinates.
+    var placeAddress: String?
     /// The bank's ID for it (Plaid transaction_id), so syncing never adds it twice.
     var externalID: String?
     /// The merchant's logo for bank-synced transactions (Plaid's, or Logo.dev's by domain).
@@ -178,7 +181,13 @@ nonisolated enum BillFrequency: String, CaseIterable, Identifiable, Codable, Sen
 final class Bill {
     var id: UUID = UUID()
     var name: String = ""
+    /// What it costs; for a variable bill, the average (what totals and Mark paid start from).
     var amountCents: Int = 0
+    /// The amount changes from one bill to the next (utilities): `amountCents` is the average,
+    /// with an optional low and high.
+    var isVariable: Bool = false
+    var minCents: Int?
+    var maxCents: Int?
     /// Day of the month, 1–31, for monthly and yearly bills. In shorter months it falls on the
     /// last day.
     var dueDay: Int = 1
@@ -215,6 +224,22 @@ final class Bill {
     }
 
     var initial: String { name.first.map { String($0).uppercased() } ?? "?" }
+
+    /// "$151.00", or "~$151.00" for a variable bill.
+    var amountLabel: String {
+        isVariable ? "~" + Money.text(amountCents) : Money.text(amountCents)
+    }
+
+    /// A variable bill's range: "$120.00–$180.00", "$120.00 or more", "up to $180.00".
+    var rangeLabel: String? {
+        guard isVariable else { return nil }
+        switch (minCents, maxCents) {
+        case let (low?, high?): return "\(Money.text(low))–\(Money.text(high))"
+        case let (low?, nil): return "\(Money.text(low)) or more"
+        case let (nil, high?): return "up to \(Money.text(high))"
+        case (nil, nil): return nil
+        }
+    }
 
     var frequency: BillFrequency {
         get { BillFrequency(rawValue: frequencyRaw) ?? .monthly }
@@ -255,6 +280,9 @@ nonisolated enum AccountSource: String, Codable, Sendable {
 final class Account {
     var id: UUID = UUID()
     var institution: String = ""
+    /// The bank's website domain ("chase.com"), for its logo. Set for banks connected
+    /// through Plaid; others are matched by name.
+    var institutionDomain: String?
     var name: String = ""
     /// Last four digits, shown as •••• 0293.
     var mask: String = ""
@@ -306,6 +334,8 @@ final class LinkedBank {
     var id: UUID = UUID()
     var itemID: String = ""
     var institution: String = ""
+    /// The bank's website domain ("chase.com"), for its logo.
+    var institutionDomain: String?
     /// Plaid's /transactions/sync cursor. Empty means start from the beginning.
     var cursor: String = ""
     var lastSynced: Date?

@@ -130,8 +130,8 @@ struct TransactionSheet: View {
 
                 if let entry, let latitude = entry.latitude, let longitude = entry.longitude {
                     Section {
-                        PlaceMap(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude), name: entry.placeName, color: MerchantColor.color(for: entry.payee))
-                            .frame(height: 140)
+                        PlaceMap(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude), name: entry.placeAddress ?? entry.placeName, color: MerchantColor.color(for: entry.payee))
+                            .frame(height: 160)
                             .listRowInsets(EdgeInsets())
                     }
                 }
@@ -140,8 +140,17 @@ struct TransactionSheet: View {
                     Section {
                         Button(role: .destructive) { confirmsDelete = true } label: {
                             Label("Delete Transaction", systemImage: "trash")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Brand.expenseInk)
+                                .frame(maxWidth: .infinity)
+                                .frame(minHeight: 40)
                         }
+                        .buttonStyle(.glass)
+                        .controlSize(.large)
+                        .tint(Brand.expenseInk)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 }
             }
             .navigationTitle(entry == nil ? "New \(draft.kind.name)" : "Transaction")
@@ -163,6 +172,15 @@ struct TransactionSheet: View {
                 }
             }
             .onAppear(perform: load)
+            .task { await locate() }
+            .onChange(of: focus) { old, new in
+                // The amount reads as currency, and turns into plain digits while it's typed.
+                if new == .amount {
+                    amountText = Money.editable(draft.amountCents)
+                } else if old == .amount {
+                    amountText = currencyText(draft.amountCents)
+                }
+            }
             .onDisappear {
                 guard pendingDelete, let entry else { return }
                 Ledger.delete(entry, in: context)
@@ -170,42 +188,60 @@ struct TransactionSheet: View {
         }
     }
 
-    /// Avatar, merchant, big amount, and the date · who · account line.
+    /// Logo on the left; merchant, amount, and the date · who · account line beside it.
     private func header(lookup: Lookup) -> some View {
         Section {
-            VStack(spacing: 4) {
-                MerchantAvatar(name: draft.payee.isEmpty ? "?" : draft.payee, isIncome: draft.kind == .income, size: 56, logoURL: entry?.logoURL)
-                TextField(draft.kind == .income ? "From" : "Merchant", text: $draft.payee)
-                    .font(.title3.bold())
-                    .multilineTextAlignment(.center)
-                    .textInputAutocapitalization(.words)
-                    .focused($focus, equals: .payee)
-                    .submitLabel(.next)
-                    .onSubmit {
-                        applyRule()
-                        focus = .amount
-                    }
-                    .padding(.top, 4)
-                TextField(Money.text(0), text: $amountText)
-                    .font(.system(size: 40, weight: .bold))
-                    .monospacedDigit()
-                    .multilineTextAlignment(.center)
-                    .keyboardType(.decimalPad)
-                    .focused($focus, equals: .amount)
-                    .foregroundStyle(draft.kind == .income ? Brand.green : .primary)
-                    .onChange(of: amountText) { _, value in
-                        draft.amountCents = Money.cents(from: value) ?? 0
-                    }
-                    .accessibilityLabel("Amount")
-                Text(metaLine(lookup: lookup))
-                    .font(.footnote)
-                    .foregroundStyle(Brand.secondaryText)
-                    .multilineTextAlignment(.center)
+            HStack(alignment: .center, spacing: 16) {
+                MerchantAvatar(name: draft.payee.isEmpty ? "?" : draft.payee, isIncome: draft.kind == .income, size: 76, logoURL: entry?.logoURL)
+                VStack(alignment: .leading, spacing: 2) {
+                    TextField(draft.kind == .income ? "From" : "Merchant", text: $draft.payee)
+                        .font(.title3.bold())
+                        .textInputAutocapitalization(.words)
+                        .focused($focus, equals: .payee)
+                        .submitLabel(.next)
+                        .onSubmit {
+                            applyRule()
+                            focus = .amount
+                        }
+                    TextField(Money.text(0), text: $amountText)
+                        .font(.system(size: 34, weight: .bold))
+                        .monospacedDigit()
+                        .keyboardType(.decimalPad)
+                        .focused($focus, equals: .amount)
+                        .foregroundStyle(draft.kind == .income ? Brand.green : .primary)
+                        .minimumScaleFactor(0.6)
+                        .onChange(of: amountText) { _, value in
+                            draft.amountCents = Money.cents(from: value) ?? 0
+                        }
+                        .accessibilityLabel("Amount")
+                    Text(metaLine(lookup: lookup))
+                        .font(.footnote)
+                        .foregroundStyle(Brand.secondaryText)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
             .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
         }
+    }
+
+    /// "$5.40", or empty for nothing yet so the placeholder shows.
+    private func currencyText(_ cents: Int) -> String {
+        cents == 0 ? "" : Money.text(cents)
+    }
+
+    /// Bank transactions with a street address but no coordinates: find the spot once with
+    /// MapKit and keep it, so the map shows from then on.
+    private func locate() async {
+        guard let entry, entry.latitude == nil,
+              let address = entry.placeAddress, !address.isEmpty,
+              let request = MKGeocodingRequest(addressString: address),
+              let location = try? await request.mapItems.first?.location else { return }
+        entry.latitude = location.coordinate.latitude
+        entry.longitude = location.coordinate.longitude
+        try? context.save()
     }
 
     private func metaLine(lookup: Lookup) -> String {
@@ -244,7 +280,7 @@ struct TransactionSheet: View {
             }
             focus = draft.payee.isEmpty ? .payee : .amount
         }
-        amountText = Money.editable(draft.amountCents)
+        amountText = focus == .amount ? Money.editable(draft.amountCents) : currencyText(draft.amountCents)
         // The rule toggle only writes when someone flips it.
         draft.alwaysUseCategory = nil
     }

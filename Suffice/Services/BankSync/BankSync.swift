@@ -34,6 +34,7 @@ enum BankSync {
             context.insert(bank)
             return bank
         }()
+        if let domain = connection.institutionDomain { bank.institutionDomain = domain }
         upsertAccounts(connection.accounts, for: bank, in: context)
         try? context.save()
 
@@ -140,6 +141,7 @@ enum BankSync {
             entry.externalID = transaction.id
             entry.logoURL = MerchantLogo.url(plaidLogo: transaction.logoUrl, domain: transaction.merchantDomain)?.absoluteString
             entry.placeName = transaction.city
+            entry.placeAddress = transaction.address
             entry.latitude = transaction.latitude
             entry.longitude = transaction.longitude
             context.insert(entry)
@@ -211,6 +213,7 @@ enum BankSync {
             }
             account.balanceCents = remote.balanceCents
             account.balanceDate = .now
+            if let domain = bank.institutionDomain { account.institutionDomain = domain }
         }
     }
 

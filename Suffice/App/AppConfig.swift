@@ -17,7 +17,7 @@ enum AppConfig {
     nonisolated static let supabasePublishableKey = "sb_publishable_3Q2nwZBnvkJQR0st35k0ng_mObjJgJD"
     /// Logo.dev publishable key (pk_…, meant to ship in apps) for merchant logos Plaid doesn't
     /// have. Empty shows initials instead.
-    nonisolated static let logoDevPublishableKey = ""
+    nonisolated static let logoDevPublishableKey = "pk_WdicpzisRSC2-QwpXtq6FA"
 
     static let appName = "Suffice"
 

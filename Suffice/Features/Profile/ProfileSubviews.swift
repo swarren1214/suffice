@@ -16,13 +16,14 @@ struct HouseholdView: View {
                     Button { editing = member } label: {
                         HStack(spacing: 12) {
                             MemberBadge(member: member, size: 32)
-                            Text(member.name).foregroundStyle(.primary)
+                            Text(member.name).foregroundStyle(Color.primary)
                             Spacer()
                             if member.id.uuidString == currentMember {
-                                Text("This iPhone").foregroundStyle(.secondary)
+                                Text("This iPhone").foregroundStyle(Color.secondary)
                             }
                         }
                     }
+                    .tint(.primary)
                 }
                 Button("Add Person", systemImage: "person.badge.plus") { showsNew = true }
             } footer: {
@@ -184,7 +185,7 @@ struct AccountsListView: View {
                 Section {
                     ForEach(banks) { bank in
                         HStack(spacing: 12) {
-                            InstitutionLogo(name: bank.institution, colorHex: 0x0E3E8C, size: 34)
+                            InstitutionLogo(name: bank.institution, colorHex: 0x0E3E8C, size: 34, domain: bank.institutionDomain)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(bank.institution)
                                 Text(status(of: bank))
@@ -219,19 +220,21 @@ struct AccountsListView: View {
                 ForEach(accounts) { account in
                     Button { editing = account } label: {
                         HStack(spacing: 12) {
-                            InstitutionLogo(name: account.institution.isEmpty ? account.name : account.institution, colorHex: account.colorHex, isCard: account.kind == .credit, size: 34)
+                            InstitutionLogo(name: account.institution.isEmpty ? account.name : account.institution, colorHex: account.colorHex, isCard: account.kind == .credit, size: 34, domain: account.institutionDomain)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(account.displayName).foregroundStyle(.primary)
+                                Text(account.displayName).foregroundStyle(Color.primary)
                                 Text("\(account.kind.name) · \(account.source.label)\(account.includeInBudget ? "" : " · Hidden")")
                                     .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Color.secondary)
                             }
                             Spacer()
                             Text(Money.text(BudgetMath.balance(of: account.record, entries: records)))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.secondary)
                                 .monospacedDigit()
                         }
                     }
+                    // Plain text, not the app's green tint that list buttons get.
+                    .tint(.primary)
                 }
                 Button("Add Account", systemImage: "plus") { showsConnect = true }
             }

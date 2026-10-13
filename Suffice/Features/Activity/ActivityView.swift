@@ -132,15 +132,16 @@ private struct MonthActivity: View {
                 Text("All").tag(ActivityTab.all)
             }
             .pickerStyle(.segmented)
-            // The count sits at the end of the New segment. A native segment can only hold a
-            // title, so the badge is drawn over it and lets taps through.
+            // The count sits just before "New". A native segment can only hold a title, so the
+            // badge is drawn over it and lets taps through. A hidden "New" holds the title's
+            // place, and a hidden copy of the badge on the other side keeps it centered.
             .overlay {
                 HStack(spacing: 0) {
-                    HStack {
-                        Spacer()
+                    HStack(spacing: 6) {
                         if toReview.count > 0 {
                             CountBadge(count: toReview.count)
-                                .padding(.trailing, 10)
+                            Text("New").font(.system(size: 14, weight: .medium)).hidden()
+                            CountBadge(count: toReview.count).hidden()
                         }
                     }
                     .frame(maxWidth: .infinity)

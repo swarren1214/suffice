@@ -263,17 +263,7 @@ struct MerchantAvatar: View {
         initial
             .overlay {
                 if let url = logoURL.flatMap(URL.init(string:)) {
-                    AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
-                        if let image = phase.image {
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: size, height: size)
-                                .background(Color.white)
-                                .clipShape(.circle)
-                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
-                        }
-                    }
+                    MerchantLogoImage(url: url, size: size)
                 }
             }
             .overlay(alignment: .bottomTrailing) {
@@ -372,9 +362,13 @@ struct CategoryPill: View {
     var color: CategoryColor?
     /// The budget's icon; a dot when there's no budget yet.
     var symbol: String? = nil
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let palette = color ?? .gray
+        // The pale tint and dark ink read well on white; in dark mode they'd glare, so the pill
+        // becomes a translucent wash of the color with the bright color as text.
+        let isDark = colorScheme == .dark
         HStack(spacing: 8) {
             if let symbol {
                 Image(systemName: symbol)
@@ -387,10 +381,10 @@ struct CategoryPill: View {
                 .font(.caption.weight(.bold))
         }
         .font(.subheadline.weight(.semibold))
-        .foregroundStyle(palette.ink)
+        .foregroundStyle(isDark ? palette.color : palette.ink)
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
-        .background(palette.tint, in: .capsule)
+        .background(isDark ? palette.color.opacity(0.22) : palette.tint, in: .capsule)
     }
 }
 
