@@ -80,15 +80,16 @@ struct ProfileView: View {
                 .buttonStyle(.plain)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
 
-                Button { confirmsErase = true } label: {
-                    Text("Erase Suffice data…")
-                        .font(.body.weight(.semibold))
+                Button(role: .destructive) { confirmsErase = true } label: {
+                    Label("Erase App Data", systemImage: "trash")
+                        .fontWeight(.semibold)
                         .foregroundStyle(Brand.expenseInk)
                         .frame(maxWidth: .infinity)
-                        .frame(minHeight: 52)
-                        .background(Brand.expense.opacity(0.12), in: .rect(cornerRadius: 26))
+                        .frame(minHeight: 40)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.glass)
+                .controlSize(.large)
+                .tint(Brand.expenseInk)
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 32)
@@ -111,14 +112,22 @@ struct ProfileView: View {
         .sheet(isPresented: $editingMe) {
             MemberEditor(member: me, isMe: true)
         }
-        .confirmationDialog("Erase everything in Suffice?", isPresented: $confirmsErase, titleVisibility: .visible) {
-            Button("Erase Everything", role: .destructive) {
-                Ledger.eraseEverything(in: context)
-                appleUserID = ""
-                onboarded = false
+        .alert("Erase App Data?", isPresented: $confirmsErase) {
+            Button("Cancel", role: .cancel) {}
+            Button("Erase", role: .destructive) {
+                // Disconnect banks on the API first (with the current session), then forget the
+                // session, then erase, so a new sign-in afterwards isn't signed out.
+                let itemIDs = ((try? context.fetch(FetchDescriptor<LinkedBank>())) ?? []).map(\.itemID)
+                Task {
+                    for itemID in itemIDs { try? await LifestyleAPI.shared.disconnectBank(itemID: itemID) }
+                    await LifestyleAPI.shared.signOut()
+                    Ledger.eraseEverything(in: context)
+                    appleUserID = ""
+                    onboarded = false
+                }
             }
         } message: {
-            Text("This removes every transaction, budget, bill, account and person from this iPhone\(AppConfig.cloudSyncEnabled ? " and your iCloud" : ""). It can't be undone.")
+            Text("This disconnects your banks and removes every transaction, budget, bill, account and person from this device\(AppConfig.cloudSyncEnabled ? " and your iCloud" : ""). It can't be undone.")
         }
     }
 

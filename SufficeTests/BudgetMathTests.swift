@@ -54,6 +54,18 @@ struct BudgetMathTests {
         #expect(line.children[1].leftCents == 598_94)
     }
 
+    @Test func aBudgetsOwnAmountWinsOverItsSubcategories() {
+        // Home is $2,950; only $2,401.79 of it is split into subcategories.
+        let home = CategoryRecord(name: "Home", limitCents: 2_950_00)
+        let mortgage = CategoryRecord(name: "Mortgage", limitCents: 2_201_79, parentID: home.id)
+        let improvements = CategoryRecord(name: "Home improvements", limitCents: 200_00, parentID: home.id, sortOrder: 1)
+        let entries = [EntryRecord(date: date(2026, 10, 9), amountCents: 50_00, categoryID: home.id)]
+        let line = BudgetMath.statuses([home, mortgage, improvements], entries: entries, in: october, calendar: calendar)[0]
+        #expect(line.limitCents == 2_950_00)
+        #expect(line.spentCents == 50_00)
+        #expect(BudgetMath.totals([home, mortgage, improvements], entries: entries, in: october, calendar: calendar).budgetedCents == 2_950_00)
+    }
+
     @Test func spendingFiledToTheBudgetItselfCounts() {
         let food = CategoryRecord(name: "Food", limitCents: 0)
         let groceries = CategoryRecord(name: "Groceries", limitCents: 600_00, parentID: food.id)

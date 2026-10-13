@@ -11,6 +11,8 @@ struct OverviewView: View {
     @State private var showsConnect = false
     @State private var editing: Account?
     @State private var expanded: Set<String> = []
+    @Environment(\.modelContext) private var context
+    @AppStorage(SettingsKey.currentMember) private var currentMember = ""
 
     var body: some View {
         let records = allEntries.map(\.record)
@@ -47,6 +49,10 @@ struct OverviewView: View {
             }
         }
         .tabToolbar { EmptyView() }
+        // Pull down to bring connected banks up to date.
+        .refreshable {
+            await BankSync.syncAll(memberID: UUID(uuidString: currentMember), in: context)
+        }
         .sheet(isPresented: $showsConnect) {
             ConnectView(step: nil) { showsConnect = false }
         }
@@ -88,46 +94,15 @@ private struct TotalCashCard: View {
     var isThisMonth: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Total cash").fontWeight(.semibold)
-                Spacer()
-                Text(isThisMonth ? "This month" : "That month")
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            Text(Money.text(cash))
-                .font(.system(size: 38, weight: .bold))
-                .monospacedDigit()
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-                .contentTransition(.numericText())
+        GlassCard {
+            GlassCardHeader(title: "Total cash", note: isThisMonth ? "This month" : "That month")
+            GlassFigure(text: Money.text(cash))
             HStack(spacing: 10) {
-                tile("Income", income)
-                tile("Expenses", expenses)
+                GlassTile(title: "Income", value: Money.text(income))
+                GlassTile(title: "Expenses", value: Money.text(expenses))
             }
         }
-        .padding(18)
-        // Liquid Glass over the green header, instead of a colored card.
-        .glassEffect(.regular, in: .rect(cornerRadius: 28))
         .accessibilityElement(children: .combine)
-    }
-
-    private func tile(_ title: String, _ cents: Int) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(Money.text(cents))
-                .font(.system(size: 19, weight: .semibold))
-                .monospacedDigit()
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.primary.opacity(0.06), in: .rect(cornerRadius: 18))
     }
 }
 

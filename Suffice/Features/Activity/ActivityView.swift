@@ -29,6 +29,14 @@ struct ActivityView: View {
             .sheet(item: $newDraft) { item in
                 TransactionSheet(entry: nil, initial: item.draft)
             }
+            // ⌘N from anywhere lands here.
+            .onChange(of: router.wantsNewTransaction, initial: true) { _, wants in
+                guard wants else { return }
+                router.wantsNewTransaction = false
+                var draft = EntryDraft()
+                draft.date = router.entryDate
+                newDraft = DraftItem(draft: draft)
+            }
     }
 
     /// The filter popover: kinds of transaction, then each person with their avatar.
@@ -59,6 +67,27 @@ enum ActivityFilter: Hashable {
         case .income: entry.kind == .income
         case .member(let id): entry.memberID == id
         }
+    }
+}
+
+/// The glass card at the top: spent this month (for whoever the filter shows), then income and
+/// how many transactions.
+private struct ActivitySummaryCard: View {
+    var entries: [LedgerEntry]
+    var isThisMonth: Bool
+
+    var body: some View {
+        let spent = entries.filter { $0.kind == .expense }.reduce(0) { $0 + $1.amountCents }
+        let income = entries.filter { $0.kind == .income }.reduce(0) { $0 + $1.amountCents }
+        GlassCard {
+            GlassCardHeader(title: "Spent", note: isThisMonth ? "This month" : "That month")
+            GlassFigure(text: Money.text(spent))
+            HStack(spacing: 10) {
+                GlassTile(title: "Income", value: Money.text(income))
+                GlassTile(title: "Transactions", value: entries.count.formatted())
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -96,6 +125,8 @@ private struct MonthActivity: View {
         let shown = tab == .review ? toReview : filtered
 
         GreenScreen("Activity") {
+            ActivitySummaryCard(entries: filtered, isThisMonth: month == MonthSpan(containing: .now))
+
             Picker("Show", selection: $tab) {
                 Text("New").tag(ActivityTab.review)
                 Text("All").tag(ActivityTab.all)
@@ -169,7 +200,7 @@ struct TransactionRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            MerchantAvatar(name: entry.payee, isIncome: entry.kind == .income, member: lookup.member(entry.memberID))
+            MerchantAvatar(name: entry.payee, isIncome: entry.kind == .income, member: lookup.member(entry.memberID), logoURL: entry.logoURL)
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.payee.isEmpty ? "Untitled" : entry.payee)
                     .font(.body.weight(.medium))

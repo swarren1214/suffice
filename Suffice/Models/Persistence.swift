@@ -10,6 +10,7 @@ enum Persistence {
         Bill.self,
         Account.self,
         PayeeRule.self,
+        LinkedBank.self,
     ])
 
     private static let log = Logger(subsystem: "com.stephenwarren.suffice", category: "persistence")

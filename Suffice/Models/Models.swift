@@ -106,6 +106,10 @@ final class LedgerEntry {
     var latitude: Double?
     var longitude: Double?
     var placeName: String?
+    /// The bank's ID for it (Plaid transaction_id), so syncing never adds it twice.
+    var externalID: String?
+    /// The merchant's logo for bank-synced transactions (Plaid's, or Logo.dev's by domain).
+    var logoURL: String?
     var createdAt: Date = Date.now
 
     init(
@@ -263,6 +267,9 @@ final class Account {
     /// Off hides it from Total cash and from the budget.
     var includeInBudget: Bool = true
     var colorHex: Int = 0x0E3E8C
+    /// For bank-synced accounts: the connected bank (LinkedBank.itemID) and Plaid's account ID.
+    var plaidItemID: String?
+    var plaidAccountID: String?
     var sortOrder: Int = 0
     var createdAt: Date = Date.now
 
@@ -289,6 +296,29 @@ final class Account {
 
     var record: AccountRecord {
         AccountRecord(id: id, kind: kind, balanceCents: balanceCents, balanceDate: balanceDate, includeInBudget: includeInBudget, isManual: source == .manual)
+    }
+}
+
+/// A bank connected through Plaid. The access token stays on the Lifestyle API; this keeps the
+/// API's ID for it (Plaid's item_id) and where syncing left off.
+@Model
+final class LinkedBank {
+    var id: UUID = UUID()
+    var itemID: String = ""
+    var institution: String = ""
+    /// Plaid's /transactions/sync cursor. Empty means start from the beginning.
+    var cursor: String = ""
+    var lastSynced: Date?
+    /// The bank wants the person to sign in again.
+    var needsReconnect: Bool = false
+    /// The Apple ID that connected it: only that person's sign-in can sync it.
+    var connectedByAppleID: String = ""
+    var createdAt: Date = Date.now
+
+    init(itemID: String, institution: String, connectedByAppleID: String) {
+        self.itemID = itemID
+        self.institution = institution
+        self.connectedByAppleID = connectedByAppleID
     }
 }
 

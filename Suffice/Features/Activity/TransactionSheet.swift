@@ -138,7 +138,9 @@ struct TransactionSheet: View {
 
                 if entry != nil {
                     Section {
-                        Button("Delete Transaction", role: .destructive) { confirmsDelete = true }
+                        Button(role: .destructive) { confirmsDelete = true } label: {
+                            Label("Delete Transaction", systemImage: "trash")
+                        }
                     }
                 }
             }
@@ -172,7 +174,7 @@ struct TransactionSheet: View {
     private func header(lookup: Lookup) -> some View {
         Section {
             VStack(spacing: 4) {
-                MerchantAvatar(name: draft.payee.isEmpty ? "?" : draft.payee, isIncome: draft.kind == .income, size: 56)
+                MerchantAvatar(name: draft.payee.isEmpty ? "?" : draft.payee, isIncome: draft.kind == .income, size: 56, logoURL: entry?.logoURL)
                 TextField(draft.kind == .income ? "From" : "Merchant", text: $draft.payee)
                     .font(.title3.bold())
                     .multilineTextAlignment(.center)

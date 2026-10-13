@@ -169,50 +169,46 @@ private struct MonthBills: View {
     }
 }
 
-/// "Due in the next 7 days" with the week strip: today in green, a red dot under bill days.
+/// The glass card at the top: what's due in the next 7 days, and the week strip with today in
+/// green and a red dot under bill days.
 private struct WeekCard: View {
     var days: [BillDay]
     var total: Int
 
     var body: some View {
-        Card {
-            VStack(spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Due in the next 7 days")
-                        .font(.subheadline)
-                        .foregroundStyle(Brand.secondaryText)
-                    Spacer()
-                    Text(Money.text(total))
-                        .font(.title2.bold())
-                        .monospacedDigit()
-                }
-                HStack(spacing: 4) {
-                    ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
-                        let isToday = index == 0
-                        VStack(spacing: 3) {
-                            Text(day.date.formatted(.dateTime.weekday(.narrow)))
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(isToday ? Color.white : Brand.secondaryText)
-                            Text(day.date.formatted(.dateTime.day()))
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(isToday ? Color.white : Color.primary)
-                            Circle()
-                                .fill(day.billIDs.isEmpty ? .clear : Brand.expense)
-                                .frame(width: 6, height: 6)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
-                        .background {
-                            if isToday {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Brand.green)
-                                    .shadow(color: Brand.green.opacity(0.3), radius: 5, y: 4)
-                            }
-                        }
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(day.date.formatted(.dateTime.weekday(.wide).month().day()))
-                        .accessibilityValue(day.billIDs.isEmpty ? "No bills" : "\(day.billIDs.count) bill\(day.billIDs.count == 1 ? "" : "s") due")
+        let count = days.reduce(0) { $0 + $1.billIDs.count }
+        GlassCard {
+            GlassCardHeader(title: "Due in the next 7 days", note: count == 0 ? "Nothing due" : "\(count) bill\(count == 1 ? "" : "s")")
+            GlassFigure(text: Money.text(total))
+            HStack(spacing: 4) {
+                ForEach(Array(days.enumerated()), id: \.element.id) { index, day in
+                    let isToday = index == 0
+                    VStack(spacing: 3) {
+                        Text(day.date.formatted(.dateTime.weekday(.narrow)))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(isToday ? Color.white : Color.secondary)
+                        Text(day.date.formatted(.dateTime.day()))
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(isToday ? Color.white : Color.primary)
+                        Circle()
+                            .fill(day.billIDs.isEmpty ? .clear : Brand.expense)
+                            .frame(width: 6, height: 6)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background {
+                        if isToday {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Brand.green)
+                                .shadow(color: Brand.green.opacity(0.3), radius: 5, y: 4)
+                        } else {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(.primary.opacity(0.06))
+                        }
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(day.date.formatted(.dateTime.weekday(.wide).month().day()))
+                    .accessibilityValue(day.billIDs.isEmpty ? "No bills" : "\(day.billIDs.count) bill\(day.billIDs.count == 1 ? "" : "s") due")
                 }
             }
         }

@@ -145,7 +145,7 @@ enum Ledger {
         return lines.joined(separator: "\n")
     }
 
-    /// Profile › Erase Suffice data. Removes everything in the store (and, with sync on, from
+    /// Profile › Erase App Data. Removes everything in the store (and, with sync on, from
     /// iCloud), then puts the starter budgets back.
     static func eraseEverything(in context: ModelContext) {
         // One by one rather than in bulk, so open screens see each deletion.
@@ -158,6 +158,7 @@ enum Ledger {
         deleteAll(Bill.self)
         deleteAll(Account.self)
         deleteAll(PayeeRule.self)
+        deleteAll(LinkedBank.self)
         deleteAll(BudgetCategory.self)
         deleteAll(Member.self)
         StarterData.insertBudgets(into: context)

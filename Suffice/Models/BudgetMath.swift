@@ -109,7 +109,8 @@ nonisolated enum BudgetMath {
     }
 
     /// The top-level budgets for `month`, each with its subcategories, in sort order. A budget
-    /// that isn't active still shows if money was spent in it.
+    /// that isn't active still shows if money was spent in it. A budget's amount is its own;
+    /// subcategories needn't add up to it.
     static func statuses(_ categories: [CategoryRecord], entries: [EntryRecord], in month: MonthSpan, calendar: Calendar = .current) -> [CategoryStatus] {
         let spent = spentByCategory(entries, in: month)
         let sorted = categories.sorted { ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name) }
@@ -125,7 +126,11 @@ nonisolated enum BudgetMath {
             let totalSpent = ownSpent + children.reduce(0) { $0 + $1.spentCents }
             let active = isActive(parent, in: month, calendar: calendar)
             guard active || totalSpent > 0 else { return nil }
-            let limit = !active ? 0 : (children.isEmpty ? parent.limitCents : children.reduce(0) { $0 + $1.limitCents })
+            // The budget's own amount; its subcategories split part or all of it. A budget
+            // with subcategories and no amount of its own (from before amounts came first)
+            // adds them up instead.
+            let childLimits = children.reduce(0) { $0 + $1.limitCents }
+            let limit = !active ? 0 : (parent.limitCents > 0 || children.isEmpty ? parent.limitCents : childLimits)
             return CategoryStatus(category: parent, spentCents: totalSpent, limitCents: limit, children: children)
         }
     }

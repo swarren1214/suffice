@@ -14,7 +14,7 @@ struct MonthMenu: View {
             HStack(spacing: 8) {
                 Image(systemName: "calendar")
                     .font(.callout.weight(.semibold))
-                Text(router.month.start.formatted(.dateTime.month(.wide).year()))
+                Text(router.month.start.formatted(.dateTime.month(.abbreviated).year()))
                     .font(.callout.weight(.semibold))
                 Image(systemName: "chevron.down")
                     .font(.caption.weight(.bold))

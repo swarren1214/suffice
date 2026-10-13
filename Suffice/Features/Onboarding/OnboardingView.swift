@@ -5,7 +5,7 @@ import SwiftUI
 /// First run: Welcome, Connect accounts, then who's in the household.
 ///
 /// Signing in is optional. Everything works without it (App Review rejects apps that hold
-/// features behind a sign-in they don't need); Sign in with Apple just fills in your name.
+/// features behind a sign-in they don't need); Sign in with Apple adds a durable identity for bank connections.
 struct OnboardingView: View {
     @AppStorage(SettingsKey.onboarded) private var onboarded = false
     @State private var step = 1
@@ -35,6 +35,7 @@ private struct WelcomeView: View {
 
     @AppStorage(SettingsKey.appleUserID) private var appleUserID = ""
     @State private var signedIn = false
+    @State private var appleNonce: String?
     @State private var errorMessage: String?
 
     init(givenName: Binding<String>, next: @escaping () -> Void) {
@@ -53,7 +54,7 @@ private struct WelcomeView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         OnboardingFeatureRow(symbol: "chart.pie.fill", title: "One budget for two", detail: "Plan each month together and see what's left at a glance.")
                         OnboardingFeatureRow(symbol: "calendar.badge.checkmark", title: "Bills on time", detail: "See what's due this week and mark it paid in a tap.")
-                        OnboardingFeatureRow(symbol: "icloud.fill", title: "Private by design", detail: "Your budget lives in your own iCloud. No ads, no tracking, no servers.")
+                        OnboardingFeatureRow(symbol: "icloud.fill", title: "Private by design", detail: "Your budget lives in your own iCloud, not on our API. No ads or tracking.")
                     }
                     // Short screens: the fine print scrolls with the content so the pinned
                     // buttons don't cover the features.
@@ -66,17 +67,33 @@ private struct WelcomeView: View {
             } else {
                 VStack(spacing: 6) {
                     SignInWithAppleButton(.signIn) { request in
-                        request.requestedScopes = [.fullName]
+                        request.requestedScopes = [.fullName, .email]
+                        do {
+                            appleNonce = try LifestyleAPI.prepareAppleRequest(request)
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
                     } onCompletion: { result in
                         switch result {
                         case .success(let authorization):
-                            if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
-                                appleUserID = credential.user
-                                if let name = credential.fullName?.givenName, !name.isEmpty {
-                                    givenName = name
+                            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                                errorMessage = "Apple did not return a usable credential. Please try again."
+                                return
+                            }
+                            let token = credential.identityToken
+                            let nonce = appleNonce
+                            let userID = credential.user
+                            let name = credential.fullName?.givenName
+                            Task { @MainActor in
+                                do {
+                                    try await LifestyleAPI.shared.signInWithApple(identityToken: token, nonce: nonce)
+                                    appleUserID = userID
+                                    if let name, !name.isEmpty { givenName = name }
+                                    withAnimation { signedIn = true }
+                                } catch {
+                                    errorMessage = error.localizedDescription
                                 }
                             }
-                            withAnimation { signedIn = true }
                         case .failure(let error as ASAuthorizationError) where error.code == .canceled:
                             break // The person closed the sheet; nothing to report.
                         case .failure(let error):
@@ -117,7 +134,7 @@ private struct WelcomeView: View {
     }
 
     private var finePrint: some View {
-        Text("Optional. Signing in adds your name. Everything else works, and syncs with iCloud, without it.")
+        Text("Optional. Signing in enables future bank connections and adds your name. Everything else works and syncs with iCloud without it.")
             .font(.caption)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)

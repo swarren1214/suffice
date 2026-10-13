@@ -28,10 +28,42 @@ struct SufficeApp: App {
     var body: some Scene {
         WindowGroup {
             AppRoot()
+                .task { await LifestyleAPI.shared.prepareSession() }
                 .environment(router)
                 .environment(lock)
         }
         .modelContainer(container)
+        .commands { SufficeCommands(router: router) }
+    }
+}
+
+/// Keyboard shortcuts for iPad (hold ⌘ to see them): new transaction, the tabs, and months.
+struct SufficeCommands: Commands {
+    let router: AppRouter
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("New Transaction") {
+                router.tab = .activity
+                router.wantsNewTransaction = true
+            }
+            .keyboardShortcut("n")
+        }
+        CommandMenu("Go") {
+            Button("Overview") { router.tab = .overview }.keyboardShortcut("1")
+            Button("Activity") { router.tab = .activity }.keyboardShortcut("2")
+            Button("Budget") { router.tab = .budget }.keyboardShortcut("3")
+            Button("Bills") { router.tab = .bills }.keyboardShortcut("4")
+            Button("Search") { router.tab = .search }.keyboardShortcut("f")
+            Divider()
+            Button("Previous Month") { router.showPreviousMonth() }.keyboardShortcut("[")
+            Button("Next Month") { router.showNextMonth() }
+                .keyboardShortcut("]")
+                .disabled(router.isThisMonth)
+            Button("This Month") { router.showThisMonth() }
+                .keyboardShortcut("t")
+                .disabled(router.isThisMonth)
+        }
     }
 }
 
@@ -65,6 +97,17 @@ final class AppRouter {
     var isThisMonth: Bool { month == MonthSpan(containing: .now) }
 
     func showThisMonth() { month = MonthSpan(containing: .now) }
+
+    func showPreviousMonth() { month = month.offset(by: -1) }
+
+    /// Never past this month.
+    func showNextMonth() {
+        let next = month.offset(by: 1)
+        if next.start <= MonthSpan(containing: .now).start { month = next }
+    }
+
+    /// Set by ⌘N; Activity opens a new transaction and clears it.
+    var wantsNewTransaction = false
 
     /// When a new transaction happens: now, or, while an earlier month is showing, today's
     /// day-of-month in that month (at noon), so back-filling last month lands in last month.
@@ -120,6 +163,13 @@ struct AppRoot: View {
                 router.rollOverIfNeeded()
                 // A new day changes which bills are due and late.
                 WidgetSync.refresh(context)
+                // Connected banks, at most hourly.
+                Task {
+                    await BankSync.syncAllIfStale(
+                        memberID: UUID(uuidString: UserDefaults.standard.string(forKey: SettingsKey.currentMember) ?? ""),
+                        in: context
+                    )
+                }
                 // Only when coming back from the background: the Face ID prompt itself
                 // passes through inactive, and cancelling it shouldn't bring it back.
                 if old == .background {

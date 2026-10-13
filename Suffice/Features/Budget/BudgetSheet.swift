@@ -4,7 +4,9 @@ import SwiftUI
 /// A budget's sheet, opened by tapping its tile (or + for a new one). Up top, how the month is
 /// going: the ring, what's left, spent of planned. Then everything about the budget, editable in
 /// place: name, monthly amount, how often it repeats, color and icon. Existing budgets also show
-/// their subcategories and this month's transactions. Nothing saves until Done.
+/// their subcategories and this month's transactions. A subcategory only has a name, an amount
+/// and (optionally) its own icon; its color and schedule come from its budget. Nothing saves
+/// until Done.
 struct BudgetSheet: View {
     /// Nil to create a new budget.
     let category: BudgetCategory?
@@ -30,8 +32,11 @@ struct BudgetSheet: View {
     /// The start month shown when the sheet opened, so an untouched starter budget keeps
     /// counting in every month.
     @State private var loadedStart = MonthSpan(containing: .now).start
-    @State private var openedChild: BudgetCategory?
-    @State private var addsSubcategory = false
+    /// The subcategories as edited in this sheet; saved with Done.
+    @State private var subDrafts: [SubcategoryDraft] = []
+    /// Existing subcategories removed in this sheet, deleted on Done.
+    @State private var removedSubIDs: [UUID] = []
+    @State private var expandedSub: UUID?
     @State private var openedEntry: LedgerEntry?
     @State private var confirmsDelete = false
     @State private var pendingDelete = false
@@ -50,6 +55,14 @@ struct BudgetSheet: View {
         let end = month.end
         _entries = Query(filter: #Predicate<LedgerEntry> { $0.date >= start && $0.date < end }, sort: \.date, order: .reverse)
     }
+
+    /// The budget a subcategory sits inside (nil for a budget).
+    private var parent: BudgetCategory? {
+        guard let id = category?.parentID ?? newParentID else { return nil }
+        return categories.first { $0.id == id }
+    }
+
+    private var isSubcategory: Bool { (category?.parentID ?? newParentID) != nil }
 
     private var children: [BudgetCategory] {
         guard let category else { return [] }
@@ -93,51 +106,41 @@ struct BudgetSheet: View {
                 VStack(spacing: 18) {
                     header
 
-                    group("Budget") {
-                        VStack(spacing: 0) {
-                            amountRow
-                            Divider().padding(.leading, 16)
-                            Picker("Repeats", selection: $recurrence) {
-                                ForEach(Recurrence.allCases) { Text($0.title).tag($0) }
-                            }
-                            .pickerStyle(.segmented)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            Divider().padding(.leading, 16)
-                            monthRow
-                            if children.isEmpty {
+                    if isSubcategory {
+                        group("Amount") { amountRow }
+                    } else {
+                        group("Budget") {
+                            VStack(spacing: 0) {
+                                amountRow
                                 Divider().padding(.leading, 16)
-                                CategoryPicker(
-                                    title: "Part of",
-                                    selection: $parentID,
-                                    choices: parents.map { CategoryChoice($0) },
-                                    noneTitle: "Its own budget",
-                                    isInList: false
-                                )
-                                .padding(.horizontal, 16)
-                                .frame(minHeight: 52)
-                            }
-                        }
-                    }
-
-                    group("Color") {
-                        HStack(spacing: 0) {
-                            ForEach(CategoryColor.allCases) { option in
-                                Button { withAnimation(.snappy) { color = option } } label: {
-                                    Circle()
-                                        .fill(option.color)
-                                        .frame(width: 28, height: 28)
-                                        .frame(width: 38, height: 44)
-                                        .overlay(Circle().strokeBorder(option == color ? option.color : .clear, lineWidth: 2.5).frame(width: 36, height: 36))
+                                Picker("Repeats", selection: $recurrence) {
+                                    ForEach(Recurrence.allCases) { Text($0.title).tag($0) }
                                 }
-                                .buttonStyle(.plain)
-                                .frame(maxWidth: .infinity)
-                                .accessibilityLabel(option.name)
-                                .accessibilityAddTraits(option == color ? .isSelected : [])
+                                .pickerStyle(.segmented)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                Divider().padding(.leading, 16)
+                                monthRow
+                                if subDrafts.isEmpty {
+                                    Divider().padding(.leading, 16)
+                                    CategoryPicker(
+                                        title: "Part of",
+                                        selection: $parentID,
+                                        choices: parents.map { CategoryChoice($0) },
+                                        noneTitle: "Its own budget",
+                                        isInList: false
+                                    )
+                                    .padding(.horizontal, 16)
+                                    .frame(minHeight: 52)
+                                }
                             }
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
+
+                        group("Color") {
+                            ColorChoiceGrid(selection: $color)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                        }
                     }
 
                     group("Icon") {
@@ -162,30 +165,8 @@ struct BudgetSheet: View {
                         .padding(12)
                     }
 
-                    if let category, category.parentID == nil, let status {
-                        group("Subcategories") {
-                            VStack(spacing: 0) {
-                                ForEach(status.children) { child in
-                                    Button {
-                                        openedChild = lookup.categories[child.id]
-                                    } label: {
-                                        SubcategoryRow(status: child, color: color)
-                                    }
-                                    .buttonStyle(.plain)
-                                    Divider().padding(.leading, 16)
-                                }
-                                Button {
-                                    addsSubcategory = true
-                                } label: {
-                                    Label("Add Subcategory", systemImage: "plus")
-                                        .font(.body.weight(.semibold))
-                                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                                        .padding(.horizontal, 16)
-                                }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(Brand.green)
-                            }
-                        }
+                    if !isSubcategory {
+                        subcategoriesSection
                     }
 
                     if category != nil, !budgetEntries.isEmpty {
@@ -204,13 +185,16 @@ struct BudgetSheet: View {
 
                     if category != nil {
                         Button(role: .destructive) { confirmsDelete = true } label: {
-                            Text("Delete Budget")
+                            Label(isSubcategory ? "Delete Subcategory" : "Delete Budget", systemImage: "trash")
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Brand.expenseInk)
                                 .frame(maxWidth: .infinity)
-                                .frame(minHeight: 52)
-                                .background(Brand.expense.opacity(0.12), in: .rect(cornerRadius: 26))
+                                .frame(minHeight: 40)
                         }
-                        .foregroundStyle(Brand.expenseInk)
-                        .fontWeight(.semibold)
+                        .buttonStyle(.glass)
+                        .controlSize(.large)
+                        .tint(Brand.expenseInk)
+                        .padding(.top, 4)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -230,20 +214,16 @@ struct BudgetSheet: View {
                 }
             }
             .confirmationDialog("Delete \(name)?", isPresented: $confirmsDelete, titleVisibility: .visible) {
-                Button("Delete Budget", role: .destructive) {
+                Button(isSubcategory ? "Delete Subcategory" : "Delete Budget", role: .destructive) {
                     pendingDelete = true
                     dismiss()
                 }
             } message: {
-                Text(children.isEmpty
+                Text(isSubcategory
+                     ? "Its transactions move to \(parent?.name ?? "its budget")."
+                     : children.isEmpty
                      ? "Its transactions stay in Activity as uncategorized."
                      : "Its subcategories become budgets of their own. Its transactions stay in Activity.")
-            }
-            .sheet(item: $openedChild) { child in
-                BudgetSheet(category: child, month: month)
-            }
-            .sheet(isPresented: $addsSubcategory) {
-                BudgetSheet(category: nil, month: month, newParentID: category?.id)
             }
             .sheet(item: $openedEntry) { entry in
                 TransactionSheet(entry: entry)
@@ -252,6 +232,12 @@ struct BudgetSheet: View {
             .onDisappear {
                 guard pendingDelete, let category else { return }
                 for child in categories where child.parentID == category.id { child.parentID = nil }
+                // A deleted subcategory's transactions go back to its budget.
+                if let parentID = category.parentID {
+                    let id: UUID? = category.id
+                    let filed = (try? context.fetch(FetchDescriptor<LedgerEntry>(predicate: #Predicate { $0.categoryID == id }))) ?? []
+                    for entry in filed { entry.categoryID = parentID }
+                }
                 context.delete(category)
                 try? context.save()
             }
@@ -286,7 +272,7 @@ struct BudgetSheet: View {
                     .accessibilityHidden(true)
             }
 
-            TextField("Budget name", text: $name)
+            TextField(isSubcategory ? "Subcategory name" : "Budget name", text: $name)
                 .font(.title2.bold())
                 .multilineTextAlignment(.center)
                 .textInputAutocapitalization(.words)
@@ -323,22 +309,14 @@ struct BudgetSheet: View {
 
     private var amountRow: some View {
         HStack {
-            Text("Monthly amount")
+            Text(isSubcategory ? "Each month" : "Monthly amount")
             Spacer()
-            if children.isEmpty {
-                TextField("$0.00", text: $amountText)
-                    .font(.title3.weight(.semibold))
-                    .monospacedDigit()
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.decimalPad)
-                    .frame(maxWidth: 160)
-            } else {
-                Text(Money.text(children.reduce(0) { $0 + $1.limitCents }))
-                    .font(.title3.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .accessibilityHint("Set by its subcategories")
-            }
+            TextField("$0.00", text: $amountText)
+                .font(.title3.weight(.semibold))
+                .monospacedDigit()
+                .multilineTextAlignment(.trailing)
+                .keyboardType(.decimalPad)
+                .frame(maxWidth: 160)
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 54)
@@ -366,13 +344,213 @@ struct BudgetSheet: View {
         .frame(minHeight: 52)
     }
 
+    // MARK: Splitting the amount
+
+    private var budgetCents: Int { Money.cents(from: amountText) ?? 0 }
+    private var assignedCents: Int { subDrafts.reduce(0) { $0 + (Money.cents(from: $1.amountText) ?? 0) } }
+    private var unassignedCents: Int { budgetCents - assignedCents }
+    private var budgetName: String {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? "this budget" : trimmed
+    }
+
+    /// Each subcategory in a lighter shade of the budget's color, for the bar and the legend.
+    private func shade(_ index: Int) -> Color {
+        color.color.opacity([1.0, 0.62, 0.4, 0.26][index % 4])
+    }
+
+    /// The budget's amount split across its subcategories: a bar and legend, a warning when
+    /// they add up to more, each subcategory with its amount, what's left for the budget
+    /// itself, and Add. Nothing has to be assigned.
+    private var subcategoriesSection: some View {
+        let isOver = unassignedCents < 0
+        let note: String? = subDrafts.isEmpty || budgetCents == 0 ? nil
+            : isOver ? "\(Money.text(-unassignedCents)) over"
+            : "\(Money.text(assignedCents)) of \(Money.text(budgetCents)) assigned"
+        return VStack(alignment: .leading, spacing: 8) {
+            group("Subcategories", note: note, noteColor: isOver ? Brand.expenseInk : Brand.secondaryText) {
+                VStack(spacing: 0) {
+                    if !subDrafts.isEmpty {
+                        if budgetCents > 0 {
+                            allocationBar(isOver: isOver)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 16)
+                            allocationLegend(isOver: isOver)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 10)
+                                .padding(.bottom, isOver ? 10 : 14)
+                        }
+                        if isOver {
+                            overBanner
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 12)
+                        }
+                        if budgetCents > 0 { Divider().padding(.leading, 16) }
+                        ForEach($subDrafts) { $draft in
+                            SubcategoryEditorRow(
+                                draft: $draft,
+                                status: status?.children.first(where: { $0.id == draft.id }),
+                                color: color,
+                                share: budgetCents > 0 ? Double(Money.cents(from: draft.amountText) ?? 0) / Double(budgetCents) : nil,
+                                budgetName: budgetName,
+                                isOver: isOver,
+                                isExpanded: expandedSub == draft.id,
+                                toggle: {
+                                    withAnimation(.snappy) { expandedSub = expandedSub == draft.id ? nil : draft.id }
+                                },
+                                remove: { removeSubcategory(draft.id) }
+                            )
+                            Divider().padding(.leading, 16)
+                        }
+                        restRow(isOver: isOver)
+                        Divider().padding(.leading, 16)
+                    }
+                    Button(action: addSubcategory) {
+                        Label("Add Subcategory", systemImage: "plus")
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Brand.green)
+                }
+            }
+            if !subDrafts.isEmpty {
+                Text("Split as much or as little as you like. What isn’t assigned stays with \(budgetName) for anything filed to it directly.")
+                    .font(.footnote)
+                    .foregroundStyle(Brand.secondaryText)
+                    .padding(.horizontal, 4)
+            }
+        }
+    }
+
+    private func allocationBar(isOver: Bool) -> some View {
+        let whole = Double(max(budgetCents, assignedCents, 1))
+        let amounts = subDrafts.map { Money.cents(from: $0.amountText) ?? 0 }
+        return GeometryReader { proxy in
+            let width = proxy.size.width
+            ZStack(alignment: .leading) {
+                HStack(spacing: 2) {
+                    ForEach(amounts.indices, id: \.self) { index in
+                        if amounts[index] > 0 {
+                            Rectangle()
+                                .fill(shade(index))
+                                .frame(width: max(2, width * Double(amounts[index]) / whole - 2))
+                        }
+                    }
+                    if unassignedCents > 0 {
+                        Rectangle().fill(Color(.systemGray5))
+                    }
+                }
+                .frame(width: width, height: 12, alignment: .leading)
+                .clipShape(.capsule)
+                if isOver {
+                    // Where the budget's amount ends.
+                    Capsule()
+                        .fill(Color.primary)
+                        .frame(width: 2, height: 20)
+                        .offset(x: width * Double(budgetCents) / whole - 1)
+                }
+            }
+            .frame(height: 20)
+        }
+        .frame(height: 20)
+        .animation(.snappy, value: amounts)
+        .accessibilityHidden(true)
+    }
+
+    private func allocationLegend(isOver: Bool) -> some View {
+        var items: [LegendItem] = []
+        for (index, draft) in subDrafts.enumerated() {
+            items.append(LegendItem(id: draft.id.uuidString, name: draft.name.isEmpty ? "New" : draft.name, cents: Money.cents(from: draft.amountText) ?? 0, color: shade(index)))
+        }
+        if !isOver {
+            items.append(LegendItem(id: "rest", name: "Unassigned", cents: unassignedCents, color: nil))
+        }
+        return FlowLayout(spacing: 14, lineSpacing: 6) {
+            ForEach(items) { item in
+                HStack(spacing: 6) {
+                    if let dot = item.color {
+                        Circle().fill(dot).frame(width: 10, height: 10)
+                    } else {
+                        Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [2.5, 2])).foregroundStyle(.tertiary).frame(width: 10, height: 10)
+                    }
+                    Text(item.name).foregroundStyle(Brand.secondaryText).lineLimit(1)
+                    Text(Money.text(item.cents)).fontWeight(.semibold).monospacedDigit()
+                }
+                .font(.footnote)
+            }
+        }
+    }
+
+    private var overBanner: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Brand.expenseInk)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Subcategories add up to **\(Money.text(-unassignedCents))** more than \(budgetName)’s monthly amount.")
+                    .font(.subheadline)
+                    .foregroundStyle(Brand.expenseInk)
+                Button("Raise \(budgetName) to \(Money.text(assignedCents))") {
+                    withAnimation(.snappy) { amountText = Money.editable(assignedCents) }
+                }
+                .buttonStyle(.glass)
+                .controlSize(.small)
+                .tint(Brand.expenseInk)
+                .fontWeight(.semibold)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(Brand.expense.opacity(0.12), in: .rect(cornerRadius: 16))
+    }
+
+    /// What's left of the budget after the subcategories: for spending filed to it directly.
+    private func restRow(isOver: Bool) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [3, 2.5]))
+                .foregroundStyle(.tertiary)
+                .frame(width: 32, height: 32)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Rest of \(budgetName)")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(Brand.secondaryText)
+                Text(isOver ? "Nothing left for \(budgetName) itself" : "Spending filed to \(budgetName) itself")
+                    .font(.caption)
+                    .foregroundStyle(Brand.secondaryText)
+            }
+            Spacer(minLength: 8)
+            Text(Money.text(max(unassignedCents, 0)))
+                .font(.body.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(isOver ? Brand.secondaryText : Color.primary)
+                .padding(.trailing, 12)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .accessibilityElement(children: .combine)
+    }
+
     /// A titled white card.
-    private func group<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func group<Content: View>(_ title: String, note: String? = nil, noteColor: Color = Brand.secondaryText, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.title3.bold())
-                .padding(.horizontal, 4)
-                .accessibilityAddTraits(.isHeader)
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.title3.bold())
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                if let note {
+                    Text(note)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(noteColor)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+            .padding(.horizontal, 4)
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
@@ -395,7 +573,13 @@ struct BudgetSheet: View {
         }
         name = category.name
         symbol = category.symbol
-        color = category.color
+        color = parent?.color ?? category.color
+        if category.limitCents == 0, !children.isEmpty {
+            amountText = Money.editable(children.reduce(0) { $0 + $1.limitCents })
+        }
+        subDrafts = children
+            .sorted { ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name) }
+            .map { SubcategoryDraft(id: $0.id, isNew: false, name: $0.name, amountText: Money.editable($0.limitCents), symbol: $0.symbol) }
         amountText = Money.editable(category.limitCents)
         recurrence = category.repeatsMonthly ? .monthly : .once
         startMonth = category.startMonth > .distantPast ? category.startMonth : MonthSpan(containing: category.createdAt).start
@@ -412,11 +596,25 @@ struct BudgetSheet: View {
             target = BudgetCategory(name: "", symbol: symbol, color: color, limitCents: 0, sortOrder: (siblings.map(\.sortOrder).max() ?? -1) + 1)
             context.insert(target)
         }
+        let oldSymbol = category?.symbol
         target.name = name.trimmingCharacters(in: .whitespaces)
         target.symbol = symbol
-        target.color = color
-        if children.isEmpty {
+
+        if let parent {
+            // A subcategory: its own name, amount and icon; the rest is its budget's.
+            target.parentID = parent.id
             target.limitCents = Money.cents(from: amountText) ?? 0
+            target.color = parent.color
+            target.repeatsMonthly = parent.repeatsMonthly
+            target.startMonth = parent.startMonth
+            try? context.save()
+            dismiss()
+            return
+        }
+
+        target.color = color
+        target.limitCents = Money.cents(from: amountText) ?? 0
+        if subDrafts.isEmpty {
             target.parentID = parentID
         }
         target.repeatsMonthly = recurrence == .monthly
@@ -424,44 +622,262 @@ struct BudgetSheet: View {
         if !untouchedStarter {
             target.startMonth = startMonth
         }
-        // Subcategories share their budget's look.
-        for child in children {
-            child.symbol = symbol
-            child.color = color
-        }
+        saveSubcategories(into: target, oldSymbol: oldSymbol)
         try? context.save()
         dismiss()
     }
+
+    // MARK: Subcategories
+
+    private func addSubcategory() {
+        let draft = SubcategoryDraft(id: UUID(), isNew: true, name: "", amountText: "", symbol: symbol)
+        withAnimation(.snappy) {
+            subDrafts.append(draft)
+            expandedSub = draft.id
+        }
+    }
+
+    private func removeSubcategory(_ id: UUID) {
+        withAnimation(.snappy) {
+            if let draft = subDrafts.first(where: { $0.id == id }), !draft.isNew {
+                removedSubIDs.append(id)
+            }
+            subDrafts.removeAll { $0.id == id }
+            if expandedSub == id { expandedSub = nil }
+        }
+    }
+
+    /// Writes the edited subcategories. They take the budget's color and schedule; their icon
+    /// follows the budget's unless they picked their own. Removed ones hand their transactions
+    /// back to the budget. New ones without a name are skipped.
+    private func saveSubcategories(into budget: BudgetCategory, oldSymbol: String?) {
+        for id in removedSubIDs {
+            guard let child = categories.first(where: { $0.id == id }) else { continue }
+            let childID: UUID? = id
+            let filed = (try? context.fetch(FetchDescriptor<LedgerEntry>(predicate: #Predicate { $0.categoryID == childID }))) ?? []
+            for entry in filed { entry.categoryID = budget.id }
+            context.delete(child)
+        }
+        for (index, draft) in subDrafts.enumerated() {
+            let trimmed = draft.name.trimmingCharacters(in: .whitespaces)
+            let child: BudgetCategory
+            if !draft.isNew, let existing = categories.first(where: { $0.id == draft.id }) {
+                child = existing
+                if !trimmed.isEmpty { child.name = trimmed }
+            } else {
+                guard !trimmed.isEmpty else { continue }
+                child = BudgetCategory(name: trimmed, symbol: draft.symbol, color: color, limitCents: 0, parentID: budget.id)
+                context.insert(child)
+            }
+            child.parentID = budget.id
+            child.limitCents = Money.cents(from: draft.amountText) ?? 0
+            child.symbol = draft.symbol == oldSymbol ? symbol : draft.symbol
+            child.color = color
+            child.repeatsMonthly = budget.repeatsMonthly
+            child.startMonth = budget.startMonth
+            child.sortOrder = index
+        }
+    }
 }
 
-/// A subcategory in the budget sheet: name, what's left, bar, spent of planned.
-private struct SubcategoryRow: View {
-    var status: CategoryStatus
+/// A subcategory as edited in the budget sheet.
+struct SubcategoryDraft: Identifiable, Equatable {
+    var id: UUID
+    var isNew: Bool
+    var name: String
+    var amountText: String
+    var symbol: String
+}
+
+/// A subcategory inside the budget sheet: its icon, name and share of the budget, with its
+/// amount right in the row. Tapped open: its name and icon, and Delete.
+private struct SubcategoryEditorRow: View {
+    @Binding var draft: SubcategoryDraft
+    var status: CategoryStatus?
     var color: CategoryColor
+    /// Its amount as a fraction of the budget's, when the budget has one.
+    var share: Double?
+    var budgetName: String
+    var isOver: Bool
+    var isExpanded: Bool
+    var toggle: () -> Void
+    var remove: () -> Void
+    @FocusState private var amountFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(status.category.name).font(.body.weight(.medium))
-                Spacer()
-                Text(status.leftCents >= 0 ? "\(Money.text(status.leftCents)) left" : "\(Money.text(-status.leftCents)) over")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(status.leftCents >= 0 ? Brand.green : Brand.expenseInk)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Button(action: toggle) {
+                    HStack(spacing: 12) {
+                        CategoryIcon(symbol: draft.symbol, color: color, size: 32)
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack(spacing: 4) {
+                                Text(draft.name.isEmpty ? "New subcategory" : draft.name)
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(draft.name.isEmpty ? .secondary : .primary)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.down")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.tertiary)
+                                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                            }
+                            Text(caption)
+                                .font(.caption)
+                                .foregroundStyle(Brand.secondaryText)
+                                .monospacedDigit()
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(isExpanded ? "Closes the subcategory" : "Edits its name and icon")
+
+                TextField("$0.00", text: $draft.amountText)
+                    .font(.body.weight(.semibold))
                     .monospacedDigit()
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.decimalPad)
+                    .focused($amountFocused)
+                    .foregroundStyle(isOver && amountFocused ? Brand.expenseInk : Color.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .frame(width: 124)
+                    .background(Color(.systemGray6), in: .rect(cornerRadius: 12))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(amountFocused ? Brand.green : .clear, lineWidth: 2)
+                    }
+                    .accessibilityLabel("\(draft.name.isEmpty ? "New subcategory" : draft.name) amount")
             }
-            ProgressBar(progress: status.progress, color: status.isOver ? Brand.expense : color.color)
-            Text("\(Money.text(status.spentCents)) of \(Money.text(status.limitCents))")
-                .font(.caption)
-                .foregroundStyle(Brand.secondaryText)
-                .monospacedDigit()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+
+            if isExpanded {
+                editor
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .contentShape(.rect)
-        .accessibilityElement(children: .combine)
+        .clipped()
+    }
+
+    /// "75% of Home", with what's been spent this month when there's any.
+    private var caption: String {
+        var parts: [String] = []
+        if let share { parts.append("\(Int((share * 100).rounded()))% of \(budgetName)") }
+        if let status, status.spentCents > 0 { parts.append("\(Money.text(status.spentCents)) spent") }
+        return parts.isEmpty ? "No amount yet" : parts.joined(separator: " · ")
+    }
+
+    private var quickIcons: [String] {
+        SymbolChoices.quick.contains(draft.symbol) ? SymbolChoices.quick : [draft.symbol] + SymbolChoices.quick.prefix(11)
+    }
+
+    private var editor: some View {
+        VStack(spacing: 0) {
+            Divider().padding(.leading, 16)
+            HStack {
+                Text("Name")
+                Spacer()
+                TextField("Subcategory name", text: $draft.name)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.words)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 48)
+            Divider().padding(.leading, 16)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Icon")
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(quickIcons, id: \.self) { option in
+                            IconChoiceButton(name: option, isSelected: option == draft.symbol, color: color) {
+                                withAnimation(.snappy) { draft.symbol = option }
+                            }
+                            .frame(width: 52)
+                            .accessibilityLabel(option.replacingOccurrences(of: ".", with: " "))
+                        }
+                        NavigationLink {
+                            IconLibraryView(selection: $draft.symbol, color: color)
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(Brand.green)
+                                .frame(width: 52, height: 44)
+                                .background(Color(.systemGray6), in: .capsule)
+                        }
+                        .accessibilityLabel("More icons")
+                    }
+                }
+                .scrollIndicators(.hidden)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            Divider().padding(.leading, 16)
+            Button(role: .destructive, action: remove) {
+                Label("Delete Subcategory", systemImage: "trash")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Brand.expenseInk)
+                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+/// One entry in the bar's legend.
+private struct LegendItem: Identifiable {
+    var id: String
+    var name: String
+    var cents: Int
+    var color: Color?
+}
+
+/// Lays its children out left to right, wrapping onto new lines (the bar's legend).
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+    var lineSpacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(subviews, width: proposal.width ?? .infinity)
+        let width = rows.map(\.width).max() ?? 0
+        let height = rows.reduce(0) { $0 + $1.height } + lineSpacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(subviews, width: bounds.width) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += row.height + lineSpacing
+        }
+    }
+
+    private struct Row { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+
+    private func arrange(_ subviews: Subviews, width: CGFloat) -> [Row] {
+        var rows: [Row] = [Row()]
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let needed = rows[rows.count - 1].indices.isEmpty ? size.width : rows[rows.count - 1].width + spacing + size.width
+            if needed > width, !rows[rows.count - 1].indices.isEmpty {
+                rows.append(Row())
+            }
+            var row = rows[rows.count - 1]
+            row.width = row.indices.isEmpty ? size.width : row.width + spacing + size.width
+            row.height = max(row.height, size.height)
+            row.indices.append(index)
+            rows[rows.count - 1] = row
+        }
+        return rows
     }
 }
 

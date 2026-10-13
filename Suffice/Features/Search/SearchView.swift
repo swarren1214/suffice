@@ -18,9 +18,9 @@ struct SearchView: View {
         GreenScreen("Search") {
             if results.isEmpty {
                 if query.isEmpty {
-                    EmptyCard(systemName: "magnifyingglass", title: "Search everything", message: "Find any transaction by merchant, budget, person, account or note.")
+                    EmptyCard(systemName: "magnifyingglass", title: "Search everything", message: "Find any transaction by merchant, budget, person, account or note.", isGlass: true)
                 } else {
-                    EmptyCard(systemName: "magnifyingglass", title: "No results", message: "Nothing matches “\(query)”.")
+                    EmptyCard(systemName: "magnifyingglass", title: "No results", message: "Nothing matches “\(query)”.", isGlass: true)
                 }
             } else {
                 Text(query.isEmpty ? "Recent" : "\(results.count) result\(results.count == 1 ? "" : "s")")

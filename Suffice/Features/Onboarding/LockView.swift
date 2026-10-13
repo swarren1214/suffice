@@ -3,21 +3,24 @@ import UIKit
 
 /// Shows the lock cover in a window above everything, sheets included.
 enum LockWindow {
-    private static var window: UIWindow?
+    /// One cover per window scene, so every iPad window (Split View, Stage Manager) is hidden.
+    private static var windows: [UIWindow] = []
 
     static func show(lock: AppLock) {
-        guard window == nil,
-              let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
-        let cover = UIWindow(windowScene: scene)
-        cover.rootViewController = UIHostingController(rootView: LockView().environment(lock))
-        cover.windowLevel = .alert + 1
-        cover.makeKeyAndVisible()
-        window = cover
+        guard windows.isEmpty else { return }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        windows = scenes.map { scene in
+            let cover = UIWindow(windowScene: scene)
+            cover.rootViewController = UIHostingController(rootView: LockView().environment(lock))
+            cover.windowLevel = .alert + 1
+            cover.makeKeyAndVisible()
+            return cover
+        }
     }
 
     static func hide() {
-        window?.isHidden = true
-        window = nil
+        windows.forEach { $0.isHidden = true }
+        windows = []
     }
 }
 

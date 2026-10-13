@@ -1,10 +1,11 @@
+import SwiftData
 import SwiftUI
 
 /// "Let us do the heavy lifting…": step 2 of onboarding, and Overview › Accounts › Add.
 ///
-/// Bank sync (Plaid) and Apple Wallet (FinanceKit) aren't wired up yet: Plaid needs its small
-/// relay deployed, and FinanceKit needs Apple to grant the entitlement. Until then, both buttons
-/// say so plainly and offer to add the account by hand, which works today.
+/// Connect a Bank runs Plaid through the Lifestyle API (BankSync): Sign in with Apple if needed,
+/// Plaid Link, then the bank's accounts and transactions arrive. Apple Wallet (FinanceKit) waits
+/// on Apple granting the entitlement, so that button says so and offers adding a card by hand.
 struct ConnectView: View {
     /// The step dots during onboarding; nil when opened from Overview.
     var step: (number: Int, of: Int)?
@@ -12,6 +13,10 @@ struct ConnectView: View {
 
     @State private var notice: Notice?
     @State private var showsManual = false
+    @State private var isConnecting = false
+    @State private var connectError: String?
+    @Environment(\.modelContext) private var context
+    @AppStorage(SettingsKey.currentMember) private var currentMember = ""
 
     private enum Notice: String, Identifiable {
         case bank, wallet
@@ -49,7 +54,8 @@ struct ConnectView: View {
             }
         } controls: { _ in
             VStack(spacing: 10) {
-                OnboardingPrimaryButton(title: "Connect a Bank", systemImage: "building.columns") { notice = .bank }
+                OnboardingPrimaryButton(title: isConnecting ? "Connecting…" : "Connect a Bank", systemImage: "building.columns") { connectBank() }
+                    .disabled(isConnecting)
                 OnboardingSecondaryButton(title: "Add from Apple Wallet", systemImage: "creditcard") { notice = .wallet }
                 Button(step == nil ? "Not now" : "Skip for now", action: onFinish)
                     .frame(minHeight: 44)
@@ -65,8 +71,31 @@ struct ConnectView: View {
         } message: { notice in
             Text(notice.message)
         }
+        .alert("Couldn't connect", isPresented: Binding(get: { connectError != nil }, set: { if !$0 { connectError = nil } })) {
+            Button("Add by Hand") { showsManual = true }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(connectError ?? "")
+        }
         .sheet(isPresented: $showsManual) {
             AccountEditor(account: nil) { onFinish() }
+        }
+    }
+}
+
+extension ConnectView {
+    private func connectBank() {
+        isConnecting = true
+        Task {
+            defer { isConnecting = false }
+            do {
+                try await BankSync.connect(memberID: UUID(uuidString: currentMember), in: context)
+                onFinish()
+            } catch BankSyncError.cancelled {
+                // They closed Apple's sheet or Plaid; nothing to say.
+            } catch {
+                connectError = error.localizedDescription
+            }
         }
     }
 }

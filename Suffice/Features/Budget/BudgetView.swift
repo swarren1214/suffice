@@ -43,13 +43,15 @@ private struct MonthBudget: View {
         let statuses = BudgetMath.statuses(categoryRecords, entries: records, in: month)
         let totals = BudgetMath.totals(categoryRecords, entries: records, in: month)
         let lookup = Lookup(categories: categories)
-        let leftText = totals.leftCents >= 0 ? "\(Money.text(totals.leftCents)) left" : "\(Money.text(-totals.leftCents)) over"
 
-        GreenScreen("Budget", trailing: totals.budgetedCents > 0 ? leftText : nil) {
+        GreenScreen("Budget") {
+            BudgetSummaryCard(totals: totals, isThisMonth: month == MonthSpan(containing: .now))
+
             if statuses.isEmpty {
                 EmptyCard(systemName: "dollarsign.circle", title: "No budgets yet", message: "Tap + to plan what each part of the month gets.")
             } else {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                // Two across on iPhone, four or five on iPad.
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
                     ForEach(statuses) { status in
                         if let category = lookup.categories[status.id] {
                             Button { opened = category } label: {
@@ -78,6 +80,29 @@ private struct MonthBudget: View {
         .sheet(item: $opened) { category in
             BudgetSheet(category: category, month: month)
         }
+    }
+}
+
+/// The glass card at the top: what's left of the plan, a bar, then planned and spent.
+private struct BudgetSummaryCard: View {
+    var totals: MonthTotals
+    var isThisMonth: Bool
+
+    var body: some View {
+        let isOver = totals.leftCents < 0
+        let progress = totals.budgetedCents > 0 ? Double(totals.spentCents) / Double(totals.budgetedCents) : 0
+        GlassCard {
+            GlassCardHeader(title: isOver ? "Over plan" : "Left to spend", note: isThisMonth ? "This month" : "That month")
+            GlassFigure(text: Money.text(abs(totals.leftCents)), color: isOver ? Brand.expenseInk : .primary)
+            if totals.budgetedCents > 0 {
+                ProgressBar(progress: progress, color: isOver ? Brand.expense : Brand.green, track: .primary.opacity(0.1))
+            }
+            HStack(spacing: 10) {
+                GlassTile(title: "Planned", value: Money.whole(totals.budgetedCents))
+                GlassTile(title: "Spent", value: Money.whole(totals.spentCents))
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

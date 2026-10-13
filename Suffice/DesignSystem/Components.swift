@@ -26,8 +26,12 @@ struct HeaderGradient: View {
 }
 
 /// A tab's screen: the green header with a big white title (and an optional figure on the
-/// right, like "$1,450.17 left"), then cards. Toolbar items come from the caller.
+/// right, like "$1,450.17 left"), then cards. Toolbar items come from the caller. On iPad the
+/// content keeps to a readable column in the middle while the green runs edge to edge.
 struct GreenScreen<Content: View>: View {
+    /// The widest the cards get (iPad, Mac). iPhones are narrower than this.
+    static var readableWidth: CGFloat { 820 }
+
     var title: String
     var trailing: String?
     @ViewBuilder var content: () -> Content
@@ -59,6 +63,8 @@ struct GreenScreen<Content: View>: View {
             .padding(.horizontal, 16)
             .padding(.top, 4)
             .padding(.bottom, 32)
+            .frame(maxWidth: Self.readableWidth)
+            .frame(maxWidth: .infinity)
         }
         .background(alignment: .top) { HeaderGradient() }
         .background(Color(.systemGroupedBackground))
@@ -71,6 +77,78 @@ struct GreenScreen<Content: View>: View {
                 Color.clear.frame(width: 1, height: 1).accessibilityHidden(true)
             }
         }
+    }
+}
+
+/// The Liquid Glass card at the top of each tab, over the green header: a small header line,
+/// a big figure, then whatever detail the tab needs.
+struct GlassCard<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .glassEffect(.regular, in: .rect(cornerRadius: 28))
+    }
+}
+
+/// The glass card's top line: a bold label on the left, a quiet note on the right.
+struct GlassCardHeader: View {
+    var title: String
+    var note: String?
+
+    var body: some View {
+        HStack {
+            Text(title).fontWeight(.semibold)
+            Spacer()
+            if let note { Text(note) }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+    }
+}
+
+/// The glass card's big number.
+struct GlassFigure: View {
+    var text: String
+    var color: Color = .primary
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 38, weight: .bold))
+            .foregroundStyle(color)
+            .monospacedDigit()
+            .minimumScaleFactor(0.6)
+            .lineLimit(1)
+            .contentTransition(.numericText())
+    }
+}
+
+/// A small figure in a soft tile inside the glass card ("Income $6,400").
+struct GlassTile: View {
+    var title: String
+    var value: String
+    var color: Color = .primary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(color)
+                .monospacedDigit()
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.primary.opacity(0.06), in: .rect(cornerRadius: 18))
     }
 }
 
@@ -177,13 +255,27 @@ struct MerchantAvatar: View {
     var isIncome = false
     var member: Member?
     var size: CGFloat = 40
+    /// The merchant's logo (bank-synced transactions). The initial shows until it loads, or
+    /// when there isn't one.
+    var logoURL: String? = nil
 
     var body: some View {
-        Text(name.first.map { String($0).uppercased() } ?? "?")
-            .font(.system(size: size * 0.4, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(isIncome ? Brand.green : MerchantColor.color(for: name), in: .circle)
+        initial
+            .overlay {
+                if let url = logoURL.flatMap(URL.init(string:)) {
+                    AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
+                        if let image = phase.image {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: size, height: size)
+                                .background(Color.white)
+                                .clipShape(.circle)
+                                .overlay(Circle().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
+                        }
+                    }
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 if let member {
                     MemberBadge(member: member, size: size * 0.5)
@@ -192,6 +284,14 @@ struct MerchantAvatar: View {
                 }
             }
             .accessibilityHidden(true)
+    }
+
+    private var initial: some View {
+        Text(name.first.map { String($0).uppercased() } ?? "?")
+            .font(.system(size: size * 0.4, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(isIncome ? Brand.green : MerchantColor.color(for: name), in: .circle)
     }
 }
 
@@ -249,11 +349,12 @@ struct CategoryRing: View {
 struct ProgressBar: View {
     var progress: Double
     var color: Color
+    var track: Color = Color(.systemGray6)
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color(.systemGray6))
+                Capsule().fill(track)
                 Capsule()
                     .fill(color)
                     .frame(width: proxy.size.width * min(max(progress, 0), 1))
@@ -298,22 +399,30 @@ struct EmptyCard: View {
     var systemName: String
     var title: String
     var message: String
+    /// Liquid Glass instead of white, for when it's the first thing over the green header.
+    var isGlass = false
 
     var body: some View {
-        Card {
-            VStack(spacing: 8) {
-                Image(systemName: systemName)
-                    .font(.largeTitle)
-                    .foregroundStyle(Brand.green)
-                Text(title).font(.headline)
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+        if isGlass {
+            GlassCard { content }
+        } else {
+            Card { content }
         }
+    }
+
+    private var content: some View {
+        VStack(spacing: 8) {
+            Image(systemName: systemName)
+                .font(.largeTitle)
+                .foregroundStyle(Brand.green)
+            Text(title).font(.headline)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
     }
 }
 

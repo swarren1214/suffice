@@ -47,11 +47,13 @@ Entertainment (Streaming, Date night) and Giving.
   two-column grid: its ring and icon, name, what's left (green, or red when over) and spent of
   planned. Tapping a tile opens the budget sheet; **+** opens a new one.
 - **Budget sheet**: the big ring, the name (editable in place), what's left, and spent of
-  planned with the days to go. Below it the budget's settings: monthly amount (set by its
-  subcategories when it has them), Every month / One month only with its start month, "Part
-  of" for making it a subcategory, color, and icon. Then its subcategories with bars (each
-  opens its own sheet, plus Add Subcategory) and this month's transactions. Done saves; the X
-  discards.
+  planned with the days to go. Below it the budget's settings: monthly amount, Every month /
+  One month only with its start month, "Part of" for making it a subcategory, color, and
+  icon. Then Subcategories: the amount set first, then split across them with a bar and
+  legend, each with its amount in the row (tap to rename, change its icon or delete), and
+  "Rest of …" for what isn't assigned, which covers spending filed to the budget itself.
+  Assigning it all isn't required; going over shows a warning with "Raise … to $x". Then
+  this month's transactions. Done saves; the X discards.
 - **Bills**: due in the next 7 days with the week strip, Upcoming with Mark paid / ✓ Paid,
   Subscriptions, and the bills not due this month with their next date. Bills repeat once, or
   every N weeks, months or years from a first due date, and can end on a date. Mark paid records
@@ -66,9 +68,10 @@ Entertainment (Streaming, Date night) and Giving.
 - **Adding transactions by hand.** The designs assume bank sync, which isn't connected yet, so
   Activity has a **+** next to Filter, and the transaction sheet gains Type, Who, Account,
   Date and Note rows when you're adding one.
-- **Connect a bank / Add from Apple Wallet** explain that Plaid needs its relay and FinanceKit
-  needs Apple's approval, and offer to add the account by hand. Manual balances move with the
-  transactions filed to them.
+- **Connect a bank** runs Plaid (see Bank sync below) once the relay is deployed and LinkKit is
+  in the build; until then it says so and offers to add the account by hand. **Add from Apple
+  Wallet** waits on Apple approving FinanceKit. Manual balances move with the transactions
+  filed to them.
 - **Onboarding** follows Hearken's sign-in screen rather than the MVP v2 Welcome and Connect
   designs. All three steps (sign in, connect accounts, who's budgeting) share one layout in
   `Features/Onboarding/OnboardingPage.swift`: icon, large title, one-line promise, content,
@@ -175,3 +178,47 @@ while the iPhone is locked.
 Both the app and the widget extension need the App Groups capability with
 `group.com.stephenwarren.suffice`. `Shared/` (Theme, Formatting, WidgetSnapshot) builds into
 both targets.
+
+## iPad
+
+The app and widgets run on iPad in every orientation, in Split View and Stage Manager.
+
+- Tabs sit in a bar at the top that opens into a sidebar (`.sidebarAdaptable`), with names;
+  the iPhone tab bar stays icons only.
+- Every tab keeps its cards to an 820 pt column in the middle; the green header runs edge to
+  edge. Budget tiles fill as many columns as fit.
+- Keyboard: ⌘N new transaction, ⌘1–4 the tabs, ⌘F search, ⌘[ and ⌘] previous and next month,
+  ⌘T this month.
+- The Face ID cover hides every open window.
+- Left to Spend and Upcoming Bills also come in the extra-large widget size.
+
+## Shared API identity and bank sync
+
+Suffice silently creates a Supabase anonymous session for non-banking calls to the shared
+Lifestyle API (`Services/LifestyleAPI.swift`, base URL and keys in `AppConfig`). Sign in with
+Apple (onboarding, or the first time someone taps Connect a Bank) replaces it with a durable
+Supabase identity; banking refuses anonymous sessions.
+
+Banks connect through Plaid (`Services/BankSync/`, LinkKit 7 via Swift Package Manager):
+
+- **Connect:** Apple sign-in if needed → `POST /v1/banking/link-token` → Plaid Link →
+  `POST /v1/banking/connections` with the public token. The API exchanges it and keeps the
+  access token, sealed, in Supabase; the app never sees it. The bank's accounts appear on
+  Overview as Plaid accounts (balances from the bank), then the first sync runs. Each bank is a
+  `LinkedBank` with its item ID and sync cursor.
+- **Sync:** `POST /v1/banking/connections/{itemId}/sync` with the bank's cursor, page by page.
+  New transactions land in Activity › New (categorized when a payee rule knows the merchant);
+  bank edits update amount, date and payee but keep people's category, person and note;
+  removals delete. `LedgerEntry.externalID` (Plaid's transaction ID) prevents duplicates.
+  Pending transactions arrive once they post. Transactions are stored only on the device and in
+  iCloud, never on the API.
+- **When:** after connecting, on pull to refresh on Overview, and on opening the app when it's
+  been an hour. Profile › Connected accounts lists banks with Sync, Sign In (when the bank
+  needs it; Plaid update mode) and Disconnect. Erase App Data disconnects banks first.
+- **Logos:** Plaid's merchant logo when there is one, otherwise Logo.dev by the merchant's
+  domain straight from its CDN (`AppConfig.logoDevPublishableKey`, a publishable `pk_` key);
+  initials otherwise.
+
+Still to do: keeping transfers and card payments from counting as spending or income, OAuth
+banks (needs `PLAID_REDIRECT_URI` on the API plus an Associated Domains universal link), and
+letting a spouse sync banks the other person connected (only the connecting Apple ID can).

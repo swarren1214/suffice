@@ -9,6 +9,7 @@ enum AppTab: Hashable {
 /// its own circle).
 struct RootTabView: View {
     @Environment(AppRouter.self) private var router
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         @Bindable var router = router
@@ -43,14 +44,22 @@ struct RootTabView: View {
                 Label("Search", systemImage: "magnifyingglass")
             }
         }
+        // iPad: a tab bar at the top that opens into a sidebar.
+        .tabViewStyle(.sidebarAdaptable)
         .tabViewSearchActivation(.searchTabSelection)
         .tabBarMinimizeBehavior(.onScrollDown)
     }
 
-    /// Icon only in the tab bar; the name is still what VoiceOver reads.
+    /// Icon only in the iPhone tab bar (VoiceOver still reads the name); icon and name on
+    /// iPad, where the tabs also show in the sidebar.
+    @ViewBuilder
     private func tabIcon(_ title: String, _ systemImage: String) -> some View {
-        Image(systemName: systemImage)
-            .accessibilityLabel(title)
+        if sizeClass == .regular {
+            Label(title, systemImage: systemImage)
+        } else {
+            Image(systemName: systemImage)
+                .accessibilityLabel(title)
+        }
     }
 }
 

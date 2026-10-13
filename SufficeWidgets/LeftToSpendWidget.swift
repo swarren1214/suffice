@@ -11,7 +11,7 @@ struct LeftToSpendWidget: Widget {
         }
         .configurationDisplayName("Left to Spend")
         .description("What's left of this month's budget, and how each budget is doing.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge, .accessoryCircular, .accessoryRectangular, .accessoryInline])
         .contentMarginsDisabled()
     }
 }
@@ -30,7 +30,7 @@ struct LeftToSpendView: View {
             inline.containerBackground(.clear, for: .widget)
         case .systemMedium:
             medium
-        case .systemLarge:
+        case .systemLarge, .systemExtraLarge:
             large
         default:
             small

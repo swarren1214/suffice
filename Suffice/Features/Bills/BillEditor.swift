@@ -167,21 +167,8 @@ struct BillEditor: View {
                 }
 
                 Section("Color") {
-                    HStack(spacing: 0) {
-                        ForEach(CategoryColor.allCases) { option in
-                            Button { color = option } label: {
-                                Circle()
-                                    .fill(option.ink)
-                                    .frame(width: 26, height: 26)
-                                    .frame(width: 36, height: 36)
-                                    .overlay(Circle().strokeBorder(option == color ? option.ink : .clear, lineWidth: 2.5))
-                            }
-                            .buttonStyle(.plain)
-                            .frame(maxWidth: .infinity)
-                            .accessibilityLabel(option.name)
-                            .accessibilityAddTraits(option == color ? .isSelected : [])
-                        }
-                    }
+                    ColorChoiceGrid(selection: $color)
+                        .padding(.vertical, 2)
                 }
 
                 Section {

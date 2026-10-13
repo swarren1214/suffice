@@ -163,16 +163,58 @@ struct MemberEditor: View {
     }
 }
 
-/// Profile › Connected accounts.
+/// Profile › Connected accounts: banks connected through Plaid (sync, sign in again,
+/// disconnect), then every account.
 struct AccountsListView: View {
     @Query(sort: \Account.sortOrder) private var accounts: [Account]
+    @Query(sort: \LinkedBank.createdAt) private var banks: [LinkedBank]
     @Query private var entries: [LedgerEntry]
+    @Environment(\.modelContext) private var context
+    @AppStorage(SettingsKey.currentMember) private var currentMember = ""
     @State private var editing: Account?
     @State private var showsConnect = false
+    @State private var working: UUID?
+    @State private var problem: String?
+    @State private var disconnecting: LinkedBank?
 
     var body: some View {
         let records = entries.map(\.record)
         List {
+            if !banks.isEmpty {
+                Section {
+                    ForEach(banks) { bank in
+                        HStack(spacing: 12) {
+                            InstitutionLogo(name: bank.institution, colorHex: 0x0E3E8C, size: 34)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(bank.institution)
+                                Text(status(of: bank))
+                                    .font(.footnote)
+                                    .foregroundStyle(bank.needsReconnect ? Brand.expenseInk : Color.secondary)
+                            }
+                            Spacer()
+                            if working == bank.id {
+                                ProgressView()
+                            } else if bank.needsReconnect {
+                                Button("Sign In") { run(bank) { try await BankSync.reconnect(bank, memberID: memberID, in: context) } }
+                                    .buttonStyle(.glass)
+                            } else {
+                                Button("Sync", systemImage: "arrow.clockwise") { run(bank) { try await BankSync.sync(bank, memberID: memberID, in: context) } }
+                                    .labelStyle(.iconOnly)
+                            }
+                        }
+                        .swipeActions {
+                            Button("Disconnect", role: .destructive) { disconnecting = bank }
+                        }
+                        .contextMenu {
+                            Button("Disconnect", systemImage: "xmark.circle", role: .destructive) { disconnecting = bank }
+                        }
+                    }
+                } header: {
+                    Text("Banks")
+                } footer: {
+                    Text("Banks sync when Suffice opens (at most hourly) and when you pull down on Overview. Transactions are kept in your iCloud, not on a server.")
+                }
+            }
             Section {
                 ForEach(accounts) { account in
                     Button { editing = account } label: {
@@ -195,11 +237,48 @@ struct AccountsListView: View {
             }
         }
         .navigationTitle("Connected accounts")
+        .alert("Couldn't sync", isPresented: Binding(get: { problem != nil }, set: { if !$0 { problem = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(problem ?? "")
+        }
+        .alert("Disconnect \(disconnecting?.institution ?? "this bank")?", isPresented: Binding(get: { disconnecting != nil }, set: { if !$0 { disconnecting = nil } })) {
+            Button("Cancel", role: .cancel) {}
+            Button("Disconnect", role: .destructive) {
+                guard let bank = disconnecting else { return }
+                run(bank) { try await BankSync.disconnect(bank, in: context) }
+            }
+        } message: {
+            Text("Its accounts stay as manual accounts with their transactions; new ones stop arriving.")
+        }
         .sheet(item: $editing) { account in
             AccountEditor(account: account)
         }
         .sheet(isPresented: $showsConnect) {
             ConnectView(step: nil) { showsConnect = false }
+        }
+    }
+}
+
+extension AccountsListView {
+    private var memberID: UUID? { UUID(uuidString: currentMember) }
+
+    private func status(of bank: LinkedBank) -> String {
+        if bank.needsReconnect { return "Needs you to sign in again" }
+        guard let synced = bank.lastSynced else { return "Not synced yet" }
+        return "Synced \(synced.formatted(.relative(presentation: .named)))"
+    }
+
+    private func run(_ bank: LinkedBank, _ work: @escaping () async throws -> Void) {
+        working = bank.id
+        Task {
+            defer { working = nil }
+            do {
+                try await work()
+            } catch BankSyncError.cancelled {
+            } catch {
+                problem = error.localizedDescription
+            }
         }
     }
 }

@@ -10,7 +10,7 @@ struct BillsWidget: Widget {
         }
         .configurationDisplayName("Upcoming Bills")
         .description("The next bills to pay, and what's due in the next 7 days.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular, .accessoryInline])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge, .accessoryRectangular, .accessoryInline])
     }
 }
 
@@ -24,7 +24,7 @@ struct BillsWidgetView: View {
             case .accessoryRectangular: rectangular
             case .accessoryInline: inline
             case .systemMedium: list(rows: 3)
-            case .systemLarge: list(rows: 7)
+            case .systemLarge, .systemExtraLarge: list(rows: 7)
             default: small
             }
         }
