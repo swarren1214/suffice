@@ -109,34 +109,42 @@ or a person never deletes history, and CloudKit has no required relationships to
 
 Every property has a default and nothing is unique, so all six sync with CloudKit as-is.
 
-## Turning on iCloud sync
+## iCloud sync and household sharing
 
-The budget is saved on the device while `AppConfig.cloudSyncEnabled` is `false`. To sync
-through the user's private iCloud database:
+The SwiftData store is local (`cloudKitDatabase: .none`). `HouseholdSync`
+(Services/Household) carries it to iCloud with **CKSyncEngine**, because SwiftData's own
+CloudKit sync can't share data with a second Apple Account.
 
-1. In **Signing & Capabilities**, confirm the iCloud container is checked under **CloudKit**.
-   Push Notifications and Remote notifications are already in the entitlements and Info.plist.
-2. Set `AppConfig.cloudSyncEnabled = true` and run once on a device signed in to iCloud.
-3. In the CloudKit Console, deploy the development schema to production before TestFlight.
-
-## Sharing with your spouse (next milestone)
-
-Private-database sync keeps one person's iPhone, iPad and Mac in step. Two people on two
-Apple Accounts need **CloudKit sharing**: one of you owns the budget and shares it, the other
-accepts, and both read and write the same records. SwiftData's CloudKit integration doesn't do
-sharing on its own, so the plan is:
-
-- Keep the SwiftData models as they are for the UI.
-- Add a small sync layer on `CKSyncEngine` that mirrors the four record types into a shared
-  record zone, with a `UICloudSharingController` invite in Settings › Household.
-- Until then, the simplest way for both of you to use it is one shared Apple Account for
-  Suffice, or one person entering everything.
-
-No server either way: shared zones live in the owner's iCloud.
+- **Zone:** everything lives in a record zone named `Household`. The owner keeps it in their
+  private database and shares the whole zone (`CKShare(recordZoneID:)`); a member who accepts
+  sees it in their shared database. Both read and write it, and each person's own devices sync
+  the same way.
+- **Records:** one per model, named `<Type>.<uuid>` (`SyncRecords.swift`). Every field is in
+  `encryptedValues`; member photos are assets.
+- **Sending:** SwiftData history (each model's `id` is `.preserveValueOnDeletion`, so deletions
+  say which record went) becomes pending changes on the engine. Changes applied from iCloud are
+  saved under the author `household-sync` and skipped.
+- **Conflicts:** last writer wins: on `serverRecordChanged` the server's version is kept and
+  ours is saved on top.
+- **Joining:** tapping an invitation (scene delegate → `HouseholdSync.receive`) asks first, then
+  replaces the budget on that device with the household's. The member's own budget stays in
+  their private iCloud and comes back when they leave or the owner stops sharing. A member's
+  other devices switch over by themselves.
+- **Erase App Data:** for a member it becomes Leave Household (erasing would delete the
+  household for both of you).
+- **Banks:** each person connects their own; a bank only syncs from the Apple ID that
+  connected it, and its transactions reach everyone through the household.
+- **Duplicates:** two devices that each seeded starter budgets, set up the household, or synced
+  the same bank end up with doubles. `SyncCleanup.mergeDuplicates` folds them together at launch
+  and after each download, always keeping the oldest copy so every device chooses alike.
+- **Schema:** a Debug build run from Xcode saves one of every record type, with every field,
+  into the CloudKit *development* environment once (then deletes it). TestFlight and the App
+  Store use *production*: in the CloudKit Console, **Deploy Schema Changes** before uploading a
+  build, and again after any model change.
+- **Status:** Profile › iCloud Sync (pull to sync now); Profile › Household › Sharing.
 
 ## Next up
 
-- CloudKit sharing for the household (above).
 - Bank transactions through Plaid with a tiny serverless relay (Plaid requires the secret
   off-device), and Apple Card / Apple Cash through FinanceKit once Apple approves it. Imports
   land in Activity › New; payee rules file them.

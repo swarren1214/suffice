@@ -1,13 +1,16 @@
+import CloudKit
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Profile › Household: the people in the budget.
+/// Profile › Household: the people in the budget, and sharing it with another Apple Account.
 struct HouseholdView: View {
     @Query(sort: \Member.sortOrder) private var members: [Member]
     @AppStorage(SettingsKey.currentMember) private var currentMember = ""
     @State private var editing: Member?
     @State private var showsNew = false
+    @State private var household = HouseholdSync.shared
+    @State private var confirmsLeave = false
 
     var body: some View {
         List {
@@ -19,7 +22,7 @@ struct HouseholdView: View {
                             Text(member.name).foregroundStyle(Color.primary)
                             Spacer()
                             if member.id.uuidString == currentMember {
-                                Text("This iPhone").foregroundStyle(Color.secondary)
+                                Text("This \(DeviceName.current)").foregroundStyle(Color.secondary)
                             }
                         }
                     }
@@ -27,16 +30,82 @@ struct HouseholdView: View {
                 }
                 Button("Add Person", systemImage: "person.badge.plus") { showsNew = true }
             } footer: {
-                Text("Everyone here shows up on the transactions they make. Sharing one budget across two Apple Accounts comes with iCloud sharing.")
+                if household.isMember && currentMember.isEmpty {
+                    Text("Tap your name and turn on This is me, so your transactions show your badge.")
+                } else {
+                    Text("Everyone here shows up on the transactions they make.")
+                }
+            }
+
+            if AppConfig.cloudSyncEnabled {
+                sharingSection
             }
         }
         .navigationTitle("Household")
+        .task { await household.refreshShare() }
+        .confirmationDialog("Leave the household?", isPresented: $confirmsLeave, titleVisibility: .visible) {
+            Button("Leave Household", role: .destructive) {
+                Task { await household.leaveHousehold() }
+            }
+        } message: {
+            Text("The shared budget is removed from your devices and your own budget comes back. \(household.ownerName ?? "The owner") can invite you again.")
+        }
         .sheet(item: $editing) { member in
             MemberEditor(member: member)
         }
         .sheet(isPresented: $showsNew) {
             MemberEditor(member: nil)
         }
+    }
+}
+
+extension HouseholdView {
+    /// Invite your partner (owner), see who's in, or leave (member).
+    @ViewBuilder
+    private var sharingSection: some View {
+        Section {
+            if household.isMember {
+                Label("Shared by \(household.ownerName ?? "your partner")", systemImage: "person.2.fill")
+                Button("Leave Household", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+                    confirmsLeave = true
+                }
+            } else {
+                ForEach(household.participants, id: \.self) { participant in
+                    HStack {
+                        Text(Self.name(of: participant))
+                        Spacer()
+                        Text(participant.acceptanceStatus == .accepted ? "Joined" : "Invited")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Button {
+                    Task { await household.presentSharing() }
+                } label: {
+                    Label(household.participants.isEmpty ? "Invite to Household" : "Manage Sharing",
+                          systemImage: household.participants.isEmpty ? "person.crop.circle.badge.plus" : "person.2.badge.gearshape")
+                }
+                .disabled(household.account != .available)
+            }
+        } header: {
+            Text("Sharing")
+        } footer: {
+            if household.isMember {
+                Text("You and \(household.ownerName ?? "your partner") share one budget through their iCloud. Every change shows up for both of you.")
+            } else if household.account != .available {
+                Text("Sign in to iCloud in Settings to share your household.")
+            } else {
+                Text("Invite your partner with their Apple Account. You'll both see and edit one budget, end-to-end encrypted in your iCloud. Each of you connects your own banks.")
+            }
+        }
+    }
+
+    private static func name(of participant: CKShare.Participant) -> String {
+        let identity = participant.userIdentity
+        if let components = identity.nameComponents {
+            let name = components.formatted(.name(style: .medium))
+            if !name.isEmpty { return name }
+        }
+        return identity.lookupInfo?.emailAddress ?? identity.lookupInfo?.phoneNumber ?? "Invited person"
     }
 }
 

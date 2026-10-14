@@ -4,15 +4,18 @@ import UIKit
 
 @main
 struct SufficeApp: App {
+    @UIApplicationDelegateAdaptor(SufficeAppDelegate.self) private var appDelegate
     @State private var router = AppRouter.shared
     @State private var lock = AppLock.shared
     private let container: ModelContainer
 
     init() {
-        let container = Persistence.makeContainer()
+        let container = Persistence.shared
         self.container = container
         StarterData.seedIfNeeded(in: container.mainContext)
-        Household.mergeDuplicateMembers(in: container.mainContext)
+        // Fold together anything two devices both made, then sync the household with iCloud.
+        SyncCleanup.mergeDuplicates(in: container.mainContext)
+        HouseholdSync.shared.start(container)
         // Alerts use the system label color rather than the brand green. Destructive buttons stay red.
         UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self]).tintColor = .label
         // Switches use the designs' bright green.
@@ -24,6 +27,8 @@ struct SufficeApp: App {
         }
         WatchSync.shared.start()
         WidgetSync.refresh(container.mainContext)
+        // Siri learns the current budget and bill names for its phrases.
+        SufficeShortcuts.updateAppShortcutParameters()
     }
 
     var body: some Scene {
@@ -132,6 +137,7 @@ struct AppRoot: View {
     @Environment(AppRouter.self) private var router
     @Environment(AppLock.self) private var lock
     @AppStorage(SettingsKey.onboarded) private var onboarded = false
+    @State private var household = HouseholdSync.shared
 
     var body: some View {
         Group {
@@ -143,6 +149,26 @@ struct AppRoot: View {
         }
         .tint(Brand.green)
         .animation(.smooth, value: onboarded)
+        // A household invitation: joining replaces the budget on this device.
+        .alert(
+            "Join \(household.inviterName)’s household?",
+            isPresented: Binding(get: { household.pendingInvite != nil }, set: { if !$0 { household.pendingInvite = nil } })
+        ) {
+            Button("Not Now", role: .cancel) {}
+            Button("Join") {
+                Task { await household.acceptInvite() }
+            }
+        } message: {
+            Text("You’ll share one budget and both see every change. The budget on this \(DeviceName.current) is replaced by the shared one. Yours stays in your iCloud and comes back if you leave.")
+        }
+        .overlay {
+            if household.isWorking {
+                ProgressView()
+                    .controlSize(.large)
+                    .padding(28)
+                    .background(.regularMaterial, in: .rect(cornerRadius: 20))
+            }
+        }
         // Widgets open suffice://overview, suffice://budget or suffice://bills.
         .onOpenURL { url in
             guard url.scheme == WidgetLink.scheme else { return }
@@ -168,6 +194,7 @@ struct AppRoot: View {
                 router.rollOverIfNeeded()
                 // A new day changes which bills are due and late.
                 WidgetSync.refresh(context)
+                Task { await household.syncNow() }
                 // Connected banks, at most hourly.
                 Task {
                     await BankSync.syncAllIfStale(

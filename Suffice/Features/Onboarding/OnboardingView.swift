@@ -142,7 +142,7 @@ private struct WelcomeView: View {
 }
 
 /// The adaptive Sign in with Apple button style: black in light mode, white in dark mode.
-private struct AdaptiveSignInStyle: ViewModifier {
+struct AdaptiveSignInStyle: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {

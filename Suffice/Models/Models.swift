@@ -2,14 +2,16 @@ import Foundation
 import SwiftData
 
 // Every model follows CloudKit's rules: every property has a default, nothing is unique, and
-// there are no required relationships. Links between records are plain UUIDs (categoryID,
+// there are no required relationships. Household sync (Services/Household) maps each one to a
+// CloudKit record. Links between records are plain UUIDs (categoryID,
 // memberID, accountID, billID, parentID), so deleting a category, account or person never
 // deletes anyone's history; those transactions just lose that label.
 
 /// A person in the household. Transactions remember who made them.
 @Model
 final class Member {
-    var id: UUID = UUID()
+    /// Kept in history after deletion, so household sync can tell iCloud which record went.
+    @Attribute(.preserveValueOnDeletion) var id: UUID = UUID()
     var name: String = ""
     var colorRaw: String = MemberColor.green.rawValue
     /// A small square JPEG (see MemberPhoto). Stored outside the database file, which CloudKit
@@ -37,7 +39,8 @@ final class Member {
 /// improvements inside Home), each with its own monthly amount.
 @Model
 final class BudgetCategory {
-    var id: UUID = UUID()
+    /// Kept in history after deletion, so household sync can tell iCloud which record went.
+    @Attribute(.preserveValueOnDeletion) var id: UUID = UUID()
     var name: String = ""
     var symbol: String = "house.fill"
     var colorRaw: String = CategoryColor.orange.rawValue
@@ -84,7 +87,8 @@ nonisolated enum EntryKind: String, CaseIterable, Identifiable, Codable, Sendabl
 /// One transaction. `amountCents` is always positive; `kind` says which way it went.
 @Model
 final class LedgerEntry {
-    var id: UUID = UUID()
+    /// Kept in history after deletion, so household sync can tell iCloud which record went.
+    @Attribute(.preserveValueOnDeletion) var id: UUID = UUID()
     var date: Date = Date.now
     var payee: String = ""
     var amountCents: Int = 0
@@ -179,7 +183,8 @@ nonisolated enum BillFrequency: String, CaseIterable, Identifiable, Codable, Sen
 /// its first due date, or just once.
 @Model
 final class Bill {
-    var id: UUID = UUID()
+    /// Kept in history after deletion, so household sync can tell iCloud which record went.
+    @Attribute(.preserveValueOnDeletion) var id: UUID = UUID()
     var name: String = ""
     /// What it costs; for a variable bill, the average (what totals and Mark paid start from).
     var amountCents: Int = 0
@@ -278,7 +283,8 @@ nonisolated enum AccountSource: String, Codable, Sendable {
 /// (Chase › Checking, Savings).
 @Model
 final class Account {
-    var id: UUID = UUID()
+    /// Kept in history after deletion, so household sync can tell iCloud which record went.
+    @Attribute(.preserveValueOnDeletion) var id: UUID = UUID()
     var institution: String = ""
     /// The bank's website domain ("chase.com"), for its logo. Set for banks connected
     /// through Plaid; others are matched by name.
@@ -331,7 +337,8 @@ final class Account {
 /// API's ID for it (Plaid's item_id) and where syncing left off.
 @Model
 final class LinkedBank {
-    var id: UUID = UUID()
+    /// Kept in history after deletion, so household sync can tell iCloud which record went.
+    @Attribute(.preserveValueOnDeletion) var id: UUID = UUID()
     var itemID: String = ""
     var institution: String = ""
     /// The bank's website domain ("chase.com"), for its logo.
@@ -355,7 +362,8 @@ final class LinkedBank {
 /// "Always use this category for Chick-fil-A". New transactions from the payee get it.
 @Model
 final class PayeeRule {
-    var id: UUID = UUID()
+    /// Kept in history after deletion, so household sync can tell iCloud which record went.
+    @Attribute(.preserveValueOnDeletion) var id: UUID = UUID()
     /// Lowercased payee name.
     var payeeKey: String = ""
     var categoryID: UUID?

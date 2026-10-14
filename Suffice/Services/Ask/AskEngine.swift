@@ -203,6 +203,20 @@ final class AskEngine {
         )
     }
 
+    /// One answer for Siri or Shortcuts, outside the Ask conversation.
+    func answerOnce(_ question: String, container: ModelContainer) async -> String {
+        attach(container)
+        guard availability == .available else { return availability.message }
+        guard let session = makeSession() else { return "Suffice couldn't read your budget just now." }
+        do {
+            let reply = try await session.respond(to: question, generating: AskReply.self, options: GenerationOptions(temperature: 0.3)).content
+            return reply.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            log.error("Siri Ask failed: \(String(describing: error), privacy: .public)")
+            return Self.message(for: error)
+        }
+    }
+
     func send(_ text: String) async {
         let question = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty, !isThinking else { return }

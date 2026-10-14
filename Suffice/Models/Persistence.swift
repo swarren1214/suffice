@@ -15,22 +15,32 @@ enum Persistence {
 
     private static let log = Logger(subsystem: "com.stephenwarren.suffice", category: "persistence")
 
+    /// True when the store couldn't be opened this launch and a fresh one was started, so
+    /// household sync downloads everything again.
+    private(set) static var startedFresh = false
+
+    /// The app's one store, shared by the app and its Siri and Shortcuts actions (which can run
+    /// before any window opens).
+    static let shared = makeContainer()
+
     static func makeContainer(inMemory: Bool = false) -> ModelContainer {
-        // Previews and tests use an in-memory store and never touch iCloud.
-        let syncs = AppConfig.cloudSyncEnabled && !inMemory
+        // The store itself is local. Household sync (Services/Household) carries it to iCloud
+        // with CKSyncEngine, which, unlike SwiftData's own CloudKit sync, can share it with
+        // another Apple Account.
         let configuration = ModelConfiguration(
             "Suffice",
             schema: schema,
             isStoredInMemoryOnly: inMemory,
-            cloudKitDatabase: syncs ? .private(AppConfig.cloudKitContainerID) : .none
+            cloudKitDatabase: .none
         )
         do {
             return try ModelContainer(for: schema, configurations: [configuration])
         } catch {
             // Never crash on launch over the store. Set the unreadable one aside (kept for
-            // recovery) and start fresh; with sync on, iCloud fills it back in.
+            // recovery) and start fresh; household sync fills it back in from iCloud.
             log.fault("Couldn't open the data store, starting a fresh one: \(error.localizedDescription, privacy: .public)")
             setAside(configuration.url)
+            startedFresh = true
             if let container = try? ModelContainer(for: schema, configurations: [configuration]) {
                 return container
             }
@@ -77,18 +87,18 @@ enum Persistence {
 enum Household {
     /// Folds people with the same name into one: their transactions move to the person kept,
     /// and so does a photo if the kept one has none. Fixes duplicates left by finishing
-    /// onboarding more than once. Runs at launch; does nothing when there are none.
-    static func mergeDuplicateMembers(in context: ModelContext, defaults: UserDefaults = .standard) {
-        let members = (try? context.fetch(FetchDescriptor<Member>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+    /// onboarding more than once, or on two devices before iCloud merged them. The oldest is
+    /// kept on every device, so two devices never delete each other's copy. Doesn't save;
+    /// `SyncCleanup.mergeDuplicates` does.
+    static func mergeDuplicateMembers(in context: ModelContext, entries: [LedgerEntry], defaults: UserDefaults = .standard) {
+        let members = (try? context.fetch(FetchDescriptor<Member>())) ?? []
         let groups = Dictionary(grouping: members) { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
         let duplicates = groups.values.filter { $0.count > 1 }
         guard !duplicates.isEmpty else { return }
         let current = defaults.string(forKey: SettingsKey.currentMember) ?? ""
-        let entries = (try? context.fetch(FetchDescriptor<LedgerEntry>())) ?? []
         for group in duplicates {
-            // Keep the one this iPhone belongs to, else the oldest.
-            let keeper = group.first { $0.id.uuidString == current } ?? group[0]
-            for extra in group where extra.id != keeper.id {
+            let keeper = SyncCleanup.oldest(group, created: \.createdAt, id: \.id)
+            for extra in SyncCleanup.sortedOldestFirst(group, created: \.createdAt, id: \.id) where extra.id != keeper.id {
                 for entry in entries where entry.memberID == extra.id {
                     entry.memberID = keeper.id
                 }
@@ -101,7 +111,6 @@ enum Household {
                 context.delete(extra)
             }
         }
-        try? context.save()
     }
 }
 

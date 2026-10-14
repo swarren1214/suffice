@@ -2,14 +2,11 @@ import Foundation
 
 /// App-wide settings: iCloud and links shown in Settings.
 enum AppConfig {
-    /// The budget syncs through the person's private CloudKit database. Needs the iCloud
-    /// (CloudKit), Push Notifications and Background Modes › Remote notifications capabilities.
-    /// When false, everything stays on this device.
-    ///
-    /// Note for the household: the private database belongs to one Apple Account. Sharing one
-    /// budget between two people's iPhones needs CloudKit sharing (see README › Sharing with
-    /// your spouse), which is the next milestone.
-    static let cloudSyncEnabled = false
+    /// Household sync: the budget goes to the person's iCloud with CKSyncEngine and can be
+    /// shared with another Apple Account (Profile › Household). Needs the iCloud (CloudKit),
+    /// Push Notifications and Background Modes › Remote notifications capabilities, and
+    /// CKSharingSupported in Info.plist. When false, everything stays on this device.
+    static let cloudSyncEnabled = true
     static let cloudKitContainerID = "iCloud.com.stephenwarren.suffice"
 
     nonisolated static let apiBaseURL = URL(string: "https://lifestyle-api-liart.vercel.app")!
