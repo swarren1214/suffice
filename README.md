@@ -206,6 +206,27 @@ Both the app and the widget extension need the App Groups capability with
 `group.com.stephenwarren.suffice`. `Shared/` (Theme, Formatting, WidgetSnapshot) builds into
 both targets.
 
+## Apple Watch
+
+`SufficeWatch` (the watch app) and `SufficeWatchWidgetsExtension` (its complications) ship
+inside the iPhone app; there's nothing separate to upload.
+
+- **Data**: the iPhone sends the widget snapshot (`Shared/WidgetSnapshot.swift`) to the watch
+  with WatchConnectivity whenever it changes (`Suffice/Services/WatchSync.swift`): as the
+  application context, and as a complication update when a Suffice complication is on the face
+  (spaced at least 10 minutes apart; iOS allows about 50 a day). The watch app saves it in the
+  watch's own app group and reloads the complications. The watch never opens the budget.
+- **Watch app**: three pages, swiped up and down: left to spend this month, every budget
+  (tightest first), and bills due in the next two weeks.
+- **Complications**:
+  - *Left to Spend*: what's left of everything planned, a ring that empties from green to red
+    (circular, corner, rectangular, inline).
+  - *Budget*: one budget, chosen when editing the face (each budget is also offered as a
+    ready-made suggestion); its icon, ring and dollars left.
+  - *Up Next* (Smart Stack): bills due today in the morning, Dining Out at lunch and dinner,
+    Groceries on weekend mornings, otherwise the budget closest to its amount. Each timeline
+    entry carries its own relevance, so the Smart Stack raises it when it matters.
+
 ## iPad
 
 The app and widgets run on iPad in every orientation, in Split View and Stage Manager.

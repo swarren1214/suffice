@@ -1,5 +1,7 @@
 import SwiftUI
+#if !os(watchOS)
 import UIKit
+#endif
 
 /// Keys for settings stored with @AppStorage. Keep every key here so views stay in sync.
 nonisolated enum SettingsKey {
@@ -34,11 +36,16 @@ nonisolated enum Brand {
     static let expense = Color(hex: 0xD9343A)
     /// Red text and icons: deep red on light backgrounds, a lighter coral in dark mode, where
     /// the deep red is too dim to read.
+    #if os(watchOS)
+    // The watch is always dark.
+    static let expenseInk = Color(hex: 0xFF6B6B)
+    #else
     static let expenseInk = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(red: 1, green: 0x6B / 255, blue: 0x6B / 255, alpha: 1)
             : UIColor(red: 0xC2 / 255, green: 0x1F / 255, blue: 0x1F / 255, alpha: 1)
     })
+    #endif
     /// The Total cash card.
     static let cashStart = Color(hex: 0x5A3FD9)
     static let cashEnd = Color(hex: 0x2563C9)

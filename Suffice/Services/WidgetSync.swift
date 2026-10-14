@@ -21,6 +21,8 @@ enum WidgetSync {
         let snapshot = makeSnapshot(context, now: now)
         if WidgetStore.save(snapshot) {
             WidgetCenter.shared.reloadAllTimelines()
+            // The watch app and its complications get the same numbers.
+            WatchSync.shared.send(snapshot)
         }
     }
 

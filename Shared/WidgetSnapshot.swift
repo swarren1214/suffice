@@ -73,6 +73,10 @@ nonisolated enum WidgetStore {
         static let leftToSpend = "LeftToSpendWidget"
         static let bills = "BillsWidget"
         static let cash = "TotalCashWidget"
+        // On Apple Watch:
+        static let watchLeftToSpend = "WatchLeftToSpend"
+        static let watchBudget = "WatchBudget"
+        static let watchUpNext = "WatchUpNext"
     }
 
     private static var url: URL? {
@@ -83,6 +87,18 @@ nonisolated enum WidgetStore {
 
     static func load() -> WidgetSnapshot? {
         guard let url, let data = try? Data(contentsOf: url) else { return nil }
+        return decode(data)
+    }
+
+    /// The snapshot as JSON, as the iPhone sends it to the watch.
+    static func encode(_ snapshot: WidgetSnapshot) -> Data? {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        encoder.outputFormatting = [.sortedKeys]
+        return try? encoder.encode(snapshot)
+    }
+
+    static func decode(_ data: Data) -> WidgetSnapshot? {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
         return try? decoder.decode(WidgetSnapshot.self, from: data)

@@ -1,23 +1,49 @@
 {
   "fill" : {
-    "automatic-gradient" : "display-p3:0.01802,0.58508,0.18010,1.00000"
+    "linear-gradient" : [
+      "display-p3:0.35129,1.00000,0.44691,1.00000",
+      "display-p3:0.00000,0.46058,0.03485,1.00000"
+    ]
   },
   "groups" : [
     {
       "layers" : [
         {
-          "image-name" : "Property 1=suffice.svg",
-          "name" : "Property 1=suffice",
-          "opacity" : 0.7,
-          "position" : {
-            "scale" : 0.95,
-            "translation-in-points" : [
-              -10,
-              -20
-            ]
-          }
+          "image-name" : "suffice-icon-01.svg",
+          "name" : "suffice-icon-01"
+        },
+        {
+          "image-name" : "suffice-icon-02.svg",
+          "name" : "suffice-icon-02",
+          "opacity" : 0.8
+        },
+        {
+          "image-name" : "suffice-icon-03.svg",
+          "name" : "suffice-icon-03"
+        },
+        {
+          "image-name" : "suffice-icon-06.svg",
+          "name" : "suffice-icon-06",
+          "opacity" : 0.7
+        },
+        {
+          "image-name" : "suffice-icon-05.svg",
+          "name" : "suffice-icon-05",
+          "opacity" : 0.8
+        },
+        {
+          "image-name" : "suffice-icon-04.svg",
+          "name" : "suffice-icon-04",
+          "opacity" : 0.6
         }
       ],
+      "position" : {
+        "scale" : 1,
+        "translation-in-points" : [
+          5,
+          -40
+        ]
+      },
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.5

@@ -22,6 +22,7 @@ struct SufficeApp: App {
         NotificationCenter.default.addObserver(forName: ModelContext.didSave, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { WidgetSync.schedule(container) }
         }
+        WatchSync.shared.start()
         WidgetSync.refresh(container.mainContext)
     }
 

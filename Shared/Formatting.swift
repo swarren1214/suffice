@@ -15,6 +15,17 @@ nonisolated enum Money {
         (Decimal(cents) / 100).formatted(.currency(code: currencyCode).precision(.fractionLength(0)))
     }
 
+    /// "$19", "$1.2k", "$12k": short enough for a watch complication.
+    static func compact(_ cents: Int) -> String {
+        let sign = cents < 0 ? "-" : ""
+        let dollars = Double(abs(cents)) / 100
+        switch dollars {
+        case 10_000...: return "\(sign)$\(Int(dollars / 1000))k"
+        case 1_000...: return sign + "$" + (dollars / 1000).formatted(.number.precision(.fractionLength(1))) + "k"
+        default: return "\(sign)$\(Int(dollars.rounded()))"
+        }
+    }
+
     /// "+$12.00" for income, "−$12.00" for spending.
     static func signed(_ cents: Int) -> String {
         (cents >= 0 ? "+" : "−") + text(abs(cents))

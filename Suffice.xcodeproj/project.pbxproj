@@ -11,6 +11,8 @@
 		5F1C00000000000000000042 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5F1C00000000000000000041 /* LinkKit */; };
 		5F1C00000000000000000047 /* KokoroSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 5F1C00000000000000000045 /* KokoroSwift */; };
 		5F1C00000000000000000048 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 5F1C00000000000000000046 /* MLX */; };
+		5F1C0000000000000000005C /* SufficeWatchWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5F1C00000000000000000051 /* SufficeWatchWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5F1C0000000000000000006B /* SufficeWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5F1C00000000000000000050 /* SufficeWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -28,6 +30,20 @@
 			remoteGlobalIDString = 5F1C00000000000000000022;
 			remoteInfo = SufficeWidgetsExtension;
 		};
+		5F1C0000000000000000005E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5F1C00000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5F1C00000000000000000060;
+			remoteInfo = SufficeWatchWidgetsExtension;
+		};
+		5F1C0000000000000000006D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5F1C00000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5F1C00000000000000000057;
+			remoteInfo = SufficeWatch;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -42,6 +58,28 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5F1C0000000000000000005B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5F1C0000000000000000005C /* SufficeWatchWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F1C0000000000000000006A /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				5F1C0000000000000000006B /* SufficeWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -53,6 +91,11 @@
 		5F1C00000000000000000023 /* SufficeWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SufficeWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		5F1C0000000000000000002E /* SufficeWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "SufficeWidgets-Info.plist"; sourceTree = "<group>"; };
 		5F1C0000000000000000002F /* SufficeWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SufficeWidgets.entitlements; sourceTree = "<group>"; };
+		5F1C00000000000000000050 /* SufficeWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SufficeWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5F1C00000000000000000051 /* SufficeWatchWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SufficeWatchWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5F1C00000000000000000054 /* SufficeWatch.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SufficeWatch.entitlements; sourceTree = "<group>"; };
+		5F1C00000000000000000055 /* SufficeWatchWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SufficeWatchWidgets.entitlements; sourceTree = "<group>"; };
+		5F1C00000000000000000056 /* SufficeWatchWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "SufficeWatchWidgets-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -74,6 +117,16 @@
 		5F1C00000000000000000021 /* SufficeWidgets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = SufficeWidgets;
+			sourceTree = "<group>";
+		};
+		5F1C00000000000000000052 /* SufficeWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SufficeWatch;
+			sourceTree = "<group>";
+		};
+		5F1C00000000000000000053 /* SufficeWatchWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SufficeWatchWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -103,6 +156,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5F1C00000000000000000059 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F1C00000000000000000062 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -114,9 +181,14 @@
 				5F1C0000000000000000001D /* Info.plist */,
 				5F1C0000000000000000002F /* SufficeWidgets.entitlements */,
 				5F1C0000000000000000002E /* SufficeWidgets-Info.plist */,
+				5F1C00000000000000000054 /* SufficeWatch.entitlements */,
+				5F1C00000000000000000055 /* SufficeWatchWidgets.entitlements */,
+				5F1C00000000000000000056 /* SufficeWatchWidgets-Info.plist */,
 				5F1C00000000000000000004 /* Suffice */,
 				5F1C00000000000000000020 /* Shared */,
 				5F1C00000000000000000021 /* SufficeWidgets */,
+				5F1C00000000000000000052 /* SufficeWatch */,
+				5F1C00000000000000000053 /* SufficeWatchWidgets */,
 				5F1C00000000000000000005 /* SufficeTests */,
 				5F1C00000000000000000003 /* Products */,
 			);
@@ -128,6 +200,8 @@
 				5F1C00000000000000000006 /* Suffice.app */,
 				5F1C00000000000000000007 /* SufficeTests.xctest */,
 				5F1C00000000000000000023 /* SufficeWidgetsExtension.appex */,
+				5F1C00000000000000000050 /* SufficeWatch.app */,
+				5F1C00000000000000000051 /* SufficeWatchWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -143,11 +217,13 @@
 				5F1C0000000000000000000B /* Frameworks */,
 				5F1C0000000000000000000C /* Resources */,
 				5F1C0000000000000000002A /* Embed Foundation Extensions */,
+				5F1C0000000000000000006A /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				5F1C0000000000000000002D /* PBXTargetDependency */,
+				5F1C0000000000000000006C /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				5F1C00000000000000000004 /* Suffice */,
@@ -209,6 +285,54 @@
 			productReference = 5F1C00000000000000000023 /* SufficeWidgetsExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		5F1C00000000000000000057 /* SufficeWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5F1C00000000000000000067 /* Build configuration list for PBXNativeTarget "SufficeWatch" */;
+			buildPhases = (
+				5F1C00000000000000000058 /* Sources */,
+				5F1C00000000000000000059 /* Frameworks */,
+				5F1C0000000000000000005A /* Resources */,
+				5F1C0000000000000000005B /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5F1C0000000000000000005D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5F1C00000000000000000020 /* Shared */,
+				5F1C00000000000000000052 /* SufficeWatch */,
+			);
+			name = SufficeWatch;
+			packageProductDependencies = (
+			);
+			productName = SufficeWatch;
+			productReference = 5F1C00000000000000000050 /* SufficeWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5F1C00000000000000000060 /* SufficeWatchWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5F1C00000000000000000064 /* Build configuration list for PBXNativeTarget "SufficeWatchWidgetsExtension" */;
+			buildPhases = (
+				5F1C00000000000000000061 /* Sources */,
+				5F1C00000000000000000062 /* Frameworks */,
+				5F1C00000000000000000063 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5F1C00000000000000000020 /* Shared */,
+				5F1C00000000000000000053 /* SufficeWatchWidgets */,
+			);
+			name = SufficeWatchWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = SufficeWatchWidgetsExtension;
+			productReference = 5F1C00000000000000000051 /* SufficeWatchWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -227,6 +351,12 @@
 						TestTargetID = 5F1C00000000000000000008;
 					};
 					5F1C00000000000000000022 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					5F1C00000000000000000057 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					5F1C00000000000000000060 = {
 						CreatedOnToolsVersion = 26.0;
 					};
 				};
@@ -253,6 +383,8 @@
 				5F1C00000000000000000008 /* Suffice */,
 				5F1C00000000000000000009 /* SufficeTests */,
 				5F1C00000000000000000022 /* SufficeWidgetsExtension */,
+				5F1C00000000000000000057 /* SufficeWatch */,
+				5F1C00000000000000000060 /* SufficeWatchWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -273,6 +405,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		5F1C00000000000000000026 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F1C0000000000000000005A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F1C00000000000000000063 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -303,6 +449,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5F1C00000000000000000058 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5F1C00000000000000000061 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -315,6 +475,16 @@
 			isa = PBXTargetDependency;
 			target = 5F1C00000000000000000022 /* SufficeWidgetsExtension */;
 			targetProxy = 5F1C0000000000000000002C /* PBXContainerItemProxy */;
+		};
+		5F1C0000000000000000005D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5F1C00000000000000000060 /* SufficeWatchWidgetsExtension */;
+			targetProxy = 5F1C0000000000000000005E /* PBXContainerItemProxy */;
+		};
+		5F1C0000000000000000006C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5F1C00000000000000000057 /* SufficeWatch */;
+			targetProxy = 5F1C0000000000000000006D /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -552,6 +722,134 @@
 			};
 			name = Release;
 		};
+		5F1C00000000000000000065 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SufficeWatchWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BH8R3BX5WF;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "SufficeWatchWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Suffice;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.stephenwarren.suffice.watchkitapp.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		5F1C00000000000000000066 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SufficeWatchWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BH8R3BX5WF;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "SufficeWatchWidgets-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Suffice;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.stephenwarren.suffice.watchkitapp.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		5F1C00000000000000000068 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = SufficeWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BH8R3BX5WF;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Suffice;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.stephenwarren.suffice;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.stephenwarren.suffice.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		5F1C00000000000000000069 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = SufficeWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BH8R3BX5WF;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Suffice;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.stephenwarren.suffice;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.stephenwarren.suffice.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -591,6 +889,24 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		5F1C00000000000000000064 /* Build configuration list for PBXNativeTarget "SufficeWatchWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5F1C00000000000000000065 /* Debug */,
+				5F1C00000000000000000066 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5F1C00000000000000000067 /* Build configuration list for PBXNativeTarget "SufficeWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5F1C00000000000000000068 /* Debug */,
+				5F1C00000000000000000069 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -601,14 +917,6 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		5F1C00000000000000000044 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 0.29.1;
-			};
-		};
 		5F1C00000000000000000040 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/plaid/plaid-link-ios-spm";
@@ -617,9 +925,22 @@
 				minimumVersion = 7.2.1;
 			};
 		};
+		5F1C00000000000000000044 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.29.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		5F1C00000000000000000041 /* LinkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5F1C00000000000000000040 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */;
+			productName = LinkKit;
+		};
 		5F1C00000000000000000045 /* KokoroSwift */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 5F1C00000000000000000043 /* XCLocalSwiftPackageReference "Packages/KokoroSwift" */;
@@ -629,11 +950,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5F1C00000000000000000044 /* XCRemoteSwiftPackageReference "mlx-swift" */;
 			productName = MLX;
-		};
-		5F1C00000000000000000041 /* LinkKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5F1C00000000000000000040 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */;
-			productName = LinkKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

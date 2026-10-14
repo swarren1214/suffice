@@ -420,33 +420,6 @@ struct EmptyCard: View {
     }
 }
 
-/// The logo's three strokes, from the WeBudget designs.
-struct BrandMark: Shape {
-    func path(in rect: CGRect) -> Path {
-        // Drawn on a 26 × 22 grid.
-        let sx = rect.width / 26, sy = rect.height / 22
-        var path = Path()
-        func line(_ x1: CGFloat, _ y1: CGFloat, _ x2: CGFloat, _ y2: CGFloat) {
-            path.move(to: CGPoint(x: rect.minX + x1 * sx, y: rect.minY + y1 * sy))
-            path.addLine(to: CGPoint(x: rect.minX + x2 * sx, y: rect.minY + y2 * sy))
-        }
-        line(3, 3, 9, 19)
-        line(11, 3, 17, 19)
-        line(19, 3, 22, 11)
-        return path
-    }
-}
-
-extension BrandMark {
-    /// The mark at a given width, stroked white.
-    static func image(width: CGFloat, color: Color = .white) -> some View {
-        BrandMark()
-            .stroke(color, style: StrokeStyle(lineWidth: width * 0.146, lineCap: .round))
-            .frame(width: width, height: width * 22 / 26)
-            .accessibilityHidden(true)
-    }
-}
-
 /// The app icon for the sign-in screen (as in Hearken). The images are Icon Composer's own
 /// exports, light and dark, already shaped, so nothing is clipped here.
 struct AppIconBadge: View {
