@@ -48,6 +48,9 @@ struct RootTabView: View {
         .tabViewStyle(.sidebarAdaptable)
         .tabViewSearchActivation(.searchTabSelection)
         .tabBarMinimizeBehavior(.onScrollDown)
+        .sheet(isPresented: $router.showsAsk) {
+            AskView()
+        }
     }
 
     /// Icon only in the iPhone tab bar (VoiceOver still reads the name); icon and name on

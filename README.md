@@ -60,8 +60,10 @@ Entertainment (Streaming, Date night) and Giving.
   the payment in Activity under the bill's category for that one due date (tap again to undo);
   long-press for Pay a Different Amount. Unpaid dues from earlier months stay listed as overdue.
 - **Search** (the round button): every transaction, any month.
-- **Profile** (the avatar): My info, Household, Connected accounts, About (with CSV export),
-  Lock with Face ID, Erase Suffice data.
+- **Ask Suffice** (✨ at the top of every tab, or ⌘K): questions about the household's money,
+  answered on the device. See "Ask Suffice" below.
+- **Profile** (the avatar): My info, Household, Connected accounts, Ask Suffice (voice settings),
+  About (with CSV export), Lock with Face ID, Erase Suffice data.
 
 ### Where the build goes beyond the designs
 
@@ -153,9 +155,34 @@ Suffice/
                   Activity (list, transaction sheet), Budget (tiles, budget sheet), Bills,
                   Search, Profile
   Models/         SwiftData models, budget math, persistence and starter budgets
-  Services/       Ledger (transactions, rules, bills, CSV, erase), Face ID lock
+  Services/       Ledger (transactions, rules, bills, CSV, erase), Face ID lock, Ask (the
+                  on-device model and its tools), Voice (speech, Kokoro, spoken replies)
+  Resources/      Kokoro voice styles (kokoro-voices.bin, ~14 MB)
+Packages/         KokoroSwift and MisakiSwift (vendored, the same copies as Sated and Hearken)
 SufficeTests/     Swift Testing
 ```
+
+## Ask Suffice
+
+The Ask sheet (`Features/Ask`) follows the Ask designs: a welcome card, "Right now" (budgets
+at 80% or more, bills due this week), suggested questions, chat, and a voice screen.
+
+- **The model**: Apple's on-device model (Foundation Models), as in Sated. It answers through
+  six tools over the household's data (`Services/Ask/AskData.swift`): getBudgets, getBudget,
+  getBills, getSpending, findTransactions and checkAffordability. Every figure comes from
+  BudgetMath; the model only words the answer.
+- **Cards**: the reply names a budget, asks for a spending breakdown, or proposes a move between
+  budgets. The app draws those cards from the live data (budget ring with biggest payees and
+  Open, bars by budget split by person, Move / Not now), so a wrong number from the model can't
+  end up in a card. A move changes the two budgets' monthly amounts only when Move is tapped.
+- **Voice**: the same hands-free conversation as Sated's Coach (`Services/Voice`): on-device
+  speech recognition, Apple's voice processing (echo cancellation, so you can interrupt), and
+  spoken replies with Kokoro. The Kokoro model (~330 MB) lives in the shared App Group
+  `group.com.stephenwarren.voice`, so if Sated or Hearken already downloaded it, Suffice uses
+  it; otherwise it downloads once from Profile › Ask Suffice or the voice screen. Until then,
+  and in the Simulator, replies use the best Apple voice installed.
+- **Devices**: needs a device with Apple Intelligence (iPhone 15 Pro or newer). Elsewhere the
+  ✨ button is hidden and everything else works.
 
 ## Widgets
 

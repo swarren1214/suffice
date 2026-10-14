@@ -63,6 +63,10 @@ struct ProfileView: View {
                         ProfileRow(symbol: "building.columns", color: Color(hex: 0x2563C9), title: "Connected accounts", value: "\(accounts.count)")
                     }
                     Divider().padding(.leading, 60)
+                    NavigationLink { AskSettingsView() } label: {
+                        ProfileRow(symbol: "sparkles", color: Color(hex: 0x5B3FD9), title: "Ask Suffice", value: OnDeviceModel.availability == .available ? "" : OnDeviceModel.availability.statusText)
+                    }
+                    Divider().padding(.leading, 60)
                     NavigationLink { AboutView() } label: {
                         ProfileRow(symbol: "info.circle", color: Brand.green, title: "About Suffice", value: "v\(AppConfig.version)")
                     }

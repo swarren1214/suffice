@@ -56,6 +56,7 @@ struct SufficeCommands: Commands {
             Button("Budget") { router.tab = .budget }.keyboardShortcut("3")
             Button("Bills") { router.tab = .bills }.keyboardShortcut("4")
             Button("Search") { router.tab = .search }.keyboardShortcut("f")
+            Button("Ask Suffice") { router.showsAsk = true }.keyboardShortcut("k")
             Divider()
             Button("Previous Month") { router.showPreviousMonth() }.keyboardShortcut("[")
             Button("Next Month") { router.showNextMonth() }
@@ -74,6 +75,8 @@ final class AppRouter {
     static let shared = AppRouter()
 
     var tab: AppTab = .overview
+    /// Ask Suffice is open (the ✨ button, or ⌘K).
+    var showsAsk = false
 
     /// The month Overview, Activity, Budget and Bills show. Never later than this month.
     var month = MonthSpan(containing: .now)

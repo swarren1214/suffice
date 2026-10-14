@@ -140,6 +140,24 @@ private struct MonthSquare: View {
     }
 }
 
+/// The ✨ button at the top right of every tab: opens Ask Suffice. Hidden on devices that can't
+/// run the on-device model.
+struct AskButton: View {
+    @Environment(AppRouter.self) private var router
+
+    var body: some View {
+        if OnDeviceModel.availability != .unsupported {
+            Button {
+                router.showsAsk = true
+            } label: {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(.white)
+            }
+            .accessibilityLabel("Ask Suffice")
+        }
+    }
+}
+
 /// The signed-in person's photo (or initial) at the top right. Opens Profile.
 struct ProfileButton: View {
     @Query(sort: \Member.sortOrder) private var members: [Member]
@@ -162,14 +180,15 @@ struct ProfileButton: View {
 }
 
 extension View {
-    /// The standard top bar for a tab: month capsule on the left, the screen's action and the
-    /// profile avatar sharing a glass capsule on the right.
+    /// The standard top bar for a tab: month capsule on the left; Ask, the screen's action and
+    /// the profile avatar sharing a glass capsule on the right.
     func tabToolbar<Action: View>(@ViewBuilder action: @escaping () -> Action) -> some View {
         toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 MonthMenu()
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
+                AskButton()
                 action()
                 ProfileButton()
             }
