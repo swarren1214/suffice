@@ -199,6 +199,13 @@ final class KokoroModel: NSObject {
     func download(wifiOnly: Bool = false) {
         // Another of the apps may already have it.
         refresh()
+        // Marked broken after a failed load, but the file is here: try loading it again rather
+        // than downloading it a second time.
+        if case .failed = state, FileManager.default.fileExists(atPath: Self.localURL.path(percentEncoded: false)) {
+            UserDefaults.standard.set(false, forKey: Keys.broken)
+            state = .ready
+            return
+        }
         switch state {
         case .notDownloaded, .failed: break
         default: return

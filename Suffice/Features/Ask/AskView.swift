@@ -8,6 +8,9 @@ struct AskView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @State private var engine = AskEngine.shared
+    @State private var speaker = AskSpeaker.shared
+    @State private var model = KokoroModel.shared
+    @AppStorage(SettingsKey.spokenReplies) private var spokenReplies = true
     @State private var draft = ""
     @State private var showsVoice = false
     @State private var openedBudget: BudgetCategory?
@@ -47,8 +50,13 @@ struct AskView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .onChange(of: engine.messages.count) {
-                    guard let last = engine.messages.last?.id else { return }
-                    withAnimation { proxy.scrollTo(last, anchor: .bottom) }
+                    guard let last = engine.messages.last else { return }
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                    // Typed questions are answered out loud too, with Kokoro once it's on the
+                    // device. (The voice screen speaks its own replies.)
+                    if spokenReplies, !showsVoice, last.role == .assistant {
+                        speaker.speak(last.text)
+                    }
                 }
                 .onChange(of: engine.isThinking) { _, thinking in
                     if thinking { withAnimation { proxy.scrollTo("thinking", anchor: .bottom) } }
@@ -70,9 +78,21 @@ struct AskView: View {
                     }
                     .accessibilityElement(children: .combine)
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        if spokenReplies { speaker.stop() }
+                        spokenReplies.toggle()
+                    } label: {
+                        Image(systemName: spokenReplies ? (speaker.isActive ? "speaker.wave.2.fill" : "speaker.wave.2") : "speaker.slash")
+                            .symbolEffect(.variableColor.iterative, options: .repeating, isActive: speaker.isActive)
+                    }
+                    .accessibilityLabel(spokenReplies ? "Spoken replies on" : "Spoken replies off")
+                    .accessibilityHint(spokenReplies ? "Turns off spoken replies" : "Turns on spoken replies")
+                }
                 if !engine.messages.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Clear") {
+                            speaker.stop()
                             withAnimation(.snappy) { engine.reset() }
                             refresh()
                         }
@@ -96,8 +116,19 @@ struct AskView: View {
                 engine.attach(context.container)
                 engine.prewarm()
                 refresh()
+                prepareVoice()
             }
+            .onDisappear { speaker.stop() }
         }
+    }
+
+    /// Spoken replies use Kokoro. If no app on this device has downloaded it yet, start the
+    /// download (on Wi-Fi), and warm it up so the first reply starts quickly.
+    private func prepareVoice() {
+        guard spokenReplies else { return }
+        model.refresh()
+        if case .notDownloaded = model.state { model.download(wifiOnly: true) }
+        speaker.prewarm()
     }
 
     private func refresh() {
@@ -164,6 +195,9 @@ struct AskView: View {
 
     private var composer: some View {
         VStack(spacing: 10) {
+            if spokenReplies {
+                VoiceStatus(model: model)
+            }
             if engine.messages.isEmpty {
                 ScrollView(.horizontal) {
                     HStack(spacing: 8) {
@@ -194,6 +228,7 @@ struct AskView: View {
                 if draft.isEmpty {
                     Button {
                         composerFocused = false
+                        speaker.stop()
                         showsVoice = true
                     } label: {
                         Image(systemName: "mic.fill")
@@ -237,11 +272,68 @@ struct AskView: View {
     }
 
     private func ask(_ text: String) {
+        speaker.stop()
         Task { await engine.send(text) }
     }
 }
 
 // MARK: - Pieces
+
+/// While Suffice's natural voice isn't on the device yet: the download's progress, or a retry.
+/// (Until it's here, replies use the best Apple voice installed.)
+private struct VoiceStatus: View {
+    var model: KokoroModel
+
+    var body: some View {
+        switch model.state {
+        case .downloading(let fraction):
+            HStack(spacing: 10) {
+                Image(systemName: "waveform")
+                    .foregroundStyle(Brand.green)
+                Text(fraction > 0 ? "Getting Suffice’s voice… \(Int(fraction * 100))%" : "Suffice’s voice downloads on Wi-Fi (\(KokoroModel.approximateSize))")
+                    .font(.footnote)
+                    .foregroundStyle(Brand.secondaryText)
+                    .monospacedDigit()
+                Spacer(minLength: 0)
+                if fraction > 0 {
+                    ProgressView(value: fraction)
+                        .tint(Brand.green)
+                        .frame(width: 60)
+                } else {
+                    Button("Use Cellular") {
+                        model.cancelDownload()
+                        model.download()
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .tint(Brand.green)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .glassEffect(.regular, in: .capsule)
+            .padding(.horizontal, 16)
+        case .failed(let message):
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(Brand.expenseInk)
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(Brand.secondaryText)
+                    .lineLimit(2)
+                Spacer(minLength: 0)
+                Button("Try Again") { model.download() }
+                    .font(.footnote.weight(.semibold))
+                    .tint(Brand.green)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .glassEffect(.regular, in: .capsule)
+            .padding(.horizontal, 16)
+        case .notDownloaded, .ready, .unavailable:
+            EmptyView()
+        }
+    }
+}
 
 /// A "Right now" row: a budget's ring, the first bill's initial, or the month's spending.
 private struct InsightRow: View {
