@@ -333,7 +333,7 @@ final class Account {
     }
 }
 
-/// A bank connected through Plaid. The access token stays on the Lifestyle API; this keeps the
+/// A bank connected through Plaid. The access token stays on the Hearth API; this keeps the
 /// API's ID for it (Plaid's item_id) and where syncing left off.
 @Model
 final class LinkedBank {

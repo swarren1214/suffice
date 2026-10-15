@@ -82,6 +82,13 @@ Entertainment (Streaming, Date night) and Giving.
   steps 2 and 3 use an SF Symbol on the same green rounded square, with step dots above.
   Signing in is optional, after Hearken's App Review rejection over sign-in. Step 3 wasn't in
   the designs; it asks for your name and your partner's. The lock screen uses the same layout.
+- **Names from Caloma:** when Caloma is on the iPhone and has shared its family, Who's
+  budgeting? offers "Use names from Caloma?" (its parents) while the partner's name is empty and
+  yours is empty or one of them; × hides it for good. Profile › Household offers "Add … from
+  Caloma" if no one's been added yet. Read through the Hearth app group
+  `group.com.stephenwarren.hearth` (`Services/CalomaFamily.swift`, `Services/Hearth/`; the app
+  target only, and tick App Groups › that group under Signing & Capabilities). Off in screenshot
+  mode.
 - The app icon is `Suffice/AppIcon.icon` from Icon Composer; the logo in the month
   button is still the WeBudget mark.
 
@@ -251,7 +258,7 @@ The app and widgets run on iPad in every orientation, in Split View and Stage Ma
 ## Shared API identity and bank sync
 
 Suffice silently creates a Supabase anonymous session for non-banking calls to the shared
-Lifestyle API (`Services/LifestyleAPI.swift`, base URL and keys in `AppConfig`). Sign in with
+Hearth API (`Services/HearthAPI.swift`, base URL and keys in `AppConfig`). Sign in with
 Apple (onboarding, or the first time someone taps Connect a Bank) replaces it with a durable
 Supabase identity; banking refuses anonymous sessions.
 

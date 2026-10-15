@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 import SwiftData
 
-/// Connecting banks through Plaid and bringing their transactions in, via the Lifestyle API.
+/// Connecting banks through Plaid and bringing their transactions in, via the Hearth API.
 ///
 /// Connect: Sign in with Apple if needed → link token → Plaid Link → the API exchanges and keeps
 /// the access token → the bank's accounts appear on Overview (source Plaid) → first sync.
@@ -18,12 +18,12 @@ enum BankSync {
     /// Walks someone through connecting a bank. Throws `.cancelled` if they back out.
     @discardableResult
     static func connect(memberID: UUID?, in context: ModelContext) async throws -> LinkedBank {
-        if !(await LifestyleAPI.shared.isSignedInWithApple) {
+        if !(await HearthAPI.shared.isSignedInWithApple) {
             try await AppleSignIn.signIn()
         }
-        let linkToken = try await withAppleRetry { try await LifestyleAPI.shared.plaidLinkToken() }
+        let linkToken = try await withAppleRetry { try await HearthAPI.shared.plaidLinkToken() }
         let link = try await PlaidLink.open(linkToken: linkToken)
-        let connection = try await LifestyleAPI.shared.connectBank(publicToken: link.publicToken)
+        let connection = try await HearthAPI.shared.connectBank(publicToken: link.publicToken)
 
         let bank = existingBank(itemID: connection.itemId, in: context) ?? {
             let bank = LinkedBank(
@@ -44,7 +44,7 @@ enum BankSync {
 
     /// For a bank that needs signing in again: Link in update mode, then a sync.
     static func reconnect(_ bank: LinkedBank, memberID: UUID?, in context: ModelContext) async throws {
-        let linkToken = try await withAppleRetry { try await LifestyleAPI.shared.plaidLinkToken(itemID: bank.itemID) }
+        let linkToken = try await withAppleRetry { try await HearthAPI.shared.plaidLinkToken(itemID: bank.itemID) }
         _ = try await PlaidLink.open(linkToken: linkToken)
         // A successful sync clears needsReconnect.
         try await sync(bank, memberID: memberID, in: context)
@@ -53,8 +53,8 @@ enum BankSync {
     /// Stops syncing a bank. Its accounts become manual and keep their transactions.
     static func disconnect(_ bank: LinkedBank, in context: ModelContext) async throws {
         do {
-            try await LifestyleAPI.shared.disconnectBank(itemID: bank.itemID)
-        } catch let failure as LifestyleAPI.APIFailure where failure.code == "CONNECTION_NOT_FOUND" {
+            try await HearthAPI.shared.disconnectBank(itemID: bank.itemID)
+        } catch let failure as HearthAPI.APIFailure where failure.code == "CONNECTION_NOT_FOUND" {
             // Already gone on the API; forget it here too.
         }
         let itemID: String? = bank.itemID
@@ -76,8 +76,8 @@ enum BankSync {
         var page: BankSyncPage
         repeat {
             do {
-                page = try await LifestyleAPI.shared.syncBank(itemID: bank.itemID, cursor: bank.cursor)
-            } catch let failure as LifestyleAPI.APIFailure where failure.needsBankReauth {
+                page = try await HearthAPI.shared.syncBank(itemID: bank.itemID, cursor: bank.cursor)
+            } catch let failure as HearthAPI.APIFailure where failure.needsBankReauth {
                 bank.needsReconnect = true
                 try? context.save()
                 throw failure
@@ -90,7 +90,7 @@ enum BankSync {
     /// Every bank this person connected. Failures are logged and skipped so one bank can't stop
     /// the rest; banks needing a new sign-in are marked.
     static func syncAll(memberID: UUID?, in context: ModelContext) async {
-        guard await LifestyleAPI.shared.isSignedInWithApple else { return }
+        guard await HearthAPI.shared.isSignedInWithApple else { return }
         let me = UserDefaults.standard.string(forKey: SettingsKey.appleUserID) ?? ""
         let banks = ((try? context.fetch(FetchDescriptor<LinkedBank>())) ?? [])
             .filter { $0.connectedByAppleID.isEmpty || $0.connectedByAppleID == me }
@@ -205,7 +205,7 @@ enum BankSync {
     private static func withAppleRetry<T>(_ call: () async throws -> T) async throws -> T {
         do {
             return try await call()
-        } catch let failure as LifestyleAPI.APIFailure where failure.needsAppleSignIn {
+        } catch let failure as HearthAPI.APIFailure where failure.needsAppleSignIn {
             try await AppleSignIn.signIn()
             return try await call()
         }

@@ -69,7 +69,7 @@ private struct WelcomeView: View {
                     SignInWithAppleButton(.signIn) { request in
                         request.requestedScopes = [.fullName, .email]
                         do {
-                            appleNonce = try LifestyleAPI.prepareAppleRequest(request)
+                            appleNonce = try HearthAPI.prepareAppleRequest(request)
                         } catch {
                             errorMessage = error.localizedDescription
                         }
@@ -86,7 +86,7 @@ private struct WelcomeView: View {
                             let name = credential.fullName?.givenName
                             Task { @MainActor in
                                 do {
-                                    try await LifestyleAPI.shared.signInWithApple(identityToken: token, nonce: nonce)
+                                    try await HearthAPI.shared.signInWithApple(identityToken: token, nonce: nonce)
                                     appleUserID = userID
                                     if let name, !name.isEmpty { givenName = name }
                                     withAnimation { signedIn = true }
@@ -164,6 +164,9 @@ private struct HouseholdSetupView: View {
     @State private var partnerPhoto: Data?
     /// Set once Start Budgeting runs, so a second tap (or Return) can't add everyone again.
     @State private var didSave = false
+    /// The parents in Caloma, if it's on this iPhone, for "Use names from Caloma?".
+    @State private var calomaParents: [String] = []
+    @AppStorage(CalomaFamily.dismissedKey) private var calomaDismissed = false
     @FocusState private var field: Field?
 
     private enum Field { case mine, partner }
@@ -183,12 +186,19 @@ private struct HouseholdSetupView: View {
         ) { isShort in
             OnboardingSymbolIcon(symbol: "person.2.fill", size: isShort ? 64 : 92)
         } content: { _ in
-            VStack(spacing: 0) {
-                nameRow("Your name", text: $myName, photo: $myPhoto, color: .green, which: .mine)
-                Divider().padding(.leading, 66)
-                nameRow("Partner's name (optional)", text: $partnerName, photo: $partnerPhoto, color: .purple, which: .partner)
+            VStack(spacing: 12) {
+                VStack(spacing: 0) {
+                    nameRow("Your name", text: $myName, photo: $myPhoto, color: .green, which: .mine)
+                    Divider().padding(.leading, 66)
+                    nameRow("Partner's name (optional)", text: $partnerName, photo: $partnerPhoto, color: .purple, which: .partner)
+                }
+                .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 20))
+
+                if let suggestion = calomaSuggestion {
+                    calomaPrompt(suggestion)
+                        .transition(.opacity)
+                }
             }
-            .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 20))
         } controls: { _ in
             VStack(spacing: 6) {
                 OnboardingPrimaryButton(title: "Start Budgeting", action: save)
@@ -199,7 +209,76 @@ private struct HouseholdSetupView: View {
         }
         .onAppear {
             if myName.isEmpty { myName = givenName }
+            calomaParents = CalomaFamily.parentNames()
         }
+    }
+
+    // MARK: Names from Caloma
+
+    /// Your name and your partner's from Caloma's parents, when that would fill something in:
+    /// the partner's name is empty, and yours is empty or already one of Caloma's parents (so
+    /// we know which one is you).
+    private var calomaSuggestion: (mine: String, partner: String?)? {
+        guard !calomaDismissed, !calomaParents.isEmpty,
+              partnerName.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        let typed = myName.trimmingCharacters(in: .whitespaces)
+        let mine: String
+        if typed.isEmpty {
+            mine = calomaParents[0]
+        } else if let match = calomaParents.first(where: { $0.lowercased() == typed.lowercased() }) {
+            mine = match
+        } else {
+            return nil
+        }
+        let partner = calomaParents.first { $0.lowercased() != mine.lowercased() }
+        // Your name is already in and Caloma has no one else: nothing to add.
+        if partner == nil && !typed.isEmpty { return nil }
+        return (mine, partner)
+    }
+
+    /// "Use names from Caloma? Steve and Jen", with Use and Not Now.
+    private func calomaPrompt(_ suggestion: (mine: String, partner: String?)) -> some View {
+        let names = ([suggestion.mine] + (suggestion.partner.map { [$0] } ?? [])).formatted(.list(type: .and))
+        return HStack(spacing: 12) {
+            Image(systemName: "house.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Color(hex: 0xE0284F), in: .rect(cornerRadius: 8))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Use names from Caloma?")
+                    .font(.subheadline.weight(.semibold))
+                Text(names)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Button("Use") {
+                withAnimation {
+                    myName = suggestion.mine
+                    if let partner = suggestion.partner { partnerName = partner }
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Brand.green)
+            .controlSize(.small)
+            Button {
+                withAnimation { calomaDismissed = true }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Not now")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 16))
     }
 
     /// A name field with the badge it will become: their photo, or their initial in their

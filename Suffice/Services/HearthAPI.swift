@@ -4,8 +4,8 @@ import Foundation
 import OSLog
 import Security
 
-actor LifestyleAPI {
-    static let shared = LifestyleAPI()
+actor HearthAPI {
+    static let shared = HearthAPI()
 
     nonisolated struct Identity: Decodable, Sendable {
         let id: String
@@ -46,7 +46,7 @@ actor LifestyleAPI {
         }
     }
 
-    /// An error from the Lifestyle API's `{ "error": { "code", "message" } }` contract.
+    /// An error from the Hearth API's `{ "error": { "code", "message" } }` contract.
     nonisolated struct APIFailure: LocalizedError, Sendable {
         let status: Int
         let code: String
@@ -79,9 +79,9 @@ actor LifestyleAPI {
         }
     }
 
-    private static let keychainService = "com.stephenwarren.lifestyle.supabase"
+    private static let keychainService = "com.stephenwarren.hearth.supabase"
     private static let keychainAccount = "session"
-    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Lifestyle", category: "api")
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Hearth", category: "api")
 
     private let session: URLSession
     private var authSession: AuthSession?

@@ -152,8 +152,8 @@ struct ProfileView: View {
                     // session, then erase, so a new sign-in afterwards isn't signed out.
                     let itemIDs = ((try? context.fetch(FetchDescriptor<LinkedBank>())) ?? []).map(\.itemID)
                     Task {
-                        for itemID in itemIDs { try? await LifestyleAPI.shared.disconnectBank(itemID: itemID) }
-                        await LifestyleAPI.shared.signOut()
+                        for itemID in itemIDs { try? await HearthAPI.shared.disconnectBank(itemID: itemID) }
+                        await HearthAPI.shared.signOut()
                         Ledger.eraseEverything(in: context)
                         appleUserID = ""
                         onboarded = false
@@ -192,7 +192,7 @@ private struct ProfileSignIn: View {
             SignInWithAppleButton(.signIn) { request in
                 request.requestedScopes = [.fullName]
                 do {
-                    nonce = try LifestyleAPI.prepareAppleRequest(request)
+                    nonce = try HearthAPI.prepareAppleRequest(request)
                 } catch {
                     errorMessage = error.localizedDescription
                 }
@@ -208,7 +208,7 @@ private struct ProfileSignIn: View {
                     let userID = credential.user
                     Task { @MainActor in
                         do {
-                            try await LifestyleAPI.shared.signInWithApple(identityToken: token, nonce: requestNonce)
+                            try await HearthAPI.shared.signInWithApple(identityToken: token, nonce: requestNonce)
                             withAnimation { appleUserID = userID }
                             // Banks you connected on another device start syncing here too.
                             await BankSync.syncAll(memberID: UUID(uuidString: currentMember), in: context)

@@ -3,7 +3,7 @@ import SwiftUI
 
 /// "Let us do the heavy lifting…": step 2 of onboarding, and Overview › Accounts › Add.
 ///
-/// Connect a Bank runs Plaid through the Lifestyle API (BankSync): Sign in with Apple if needed,
+/// Connect a Bank runs Plaid through the Hearth API (BankSync): Sign in with Apple if needed,
 /// Plaid Link, then the bank's accounts and transactions arrive. Apple Wallet (FinanceKit) waits
 /// on Apple granting the entitlement, so that button says so and offers adding a card by hand.
 struct ConnectView: View {

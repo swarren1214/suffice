@@ -41,7 +41,7 @@ struct SufficeApp: App {
         WindowGroup {
             AppRoot()
                 .background(KeyboardDismissal().frame(width: 0, height: 0))
-                .task { if !ScreenshotMode.isOn { await LifestyleAPI.shared.prepareSession() } }
+                .task { if !ScreenshotMode.isOn { await HearthAPI.shared.prepareSession() } }
                 .environment(router)
                 .environment(lock)
         }

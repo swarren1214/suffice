@@ -3,7 +3,7 @@ import UIKit
 
 /// Sign in with Apple from anywhere (Connect a Bank, when someone skipped it in onboarding):
 /// shows Apple's sheet with a nonce, then trades the identity token for a durable Supabase
-/// session through LifestyleAPI, the same as onboarding's button.
+/// session through HearthAPI, the same as onboarding's button.
 @MainActor
 final class AppleSignIn: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     private var continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>?
@@ -18,7 +18,7 @@ final class AppleSignIn: NSObject, ASAuthorizationControllerDelegate, ASAuthoriz
         defer { current = nil }
         let request = ASAuthorizationAppleIDProvider().createRequest()
         request.requestedScopes = [.fullName]
-        helper.nonce = try LifestyleAPI.prepareAppleRequest(request)
+        helper.nonce = try HearthAPI.prepareAppleRequest(request)
         let credential: ASAuthorizationAppleIDCredential = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) in
             helper.continuation = continuation
             let controller = ASAuthorizationController(authorizationRequests: [request])
@@ -26,7 +26,7 @@ final class AppleSignIn: NSObject, ASAuthorizationControllerDelegate, ASAuthoriz
             controller.presentationContextProvider = helper
             controller.performRequests()
         }
-        try await LifestyleAPI.shared.signInWithApple(identityToken: credential.identityToken, nonce: helper.nonce)
+        try await HearthAPI.shared.signInWithApple(identityToken: credential.identityToken, nonce: helper.nonce)
         UserDefaults.standard.set(credential.user, forKey: SettingsKey.appleUserID)
     }
 
@@ -34,7 +34,7 @@ final class AppleSignIn: NSObject, ASAuthorizationControllerDelegate, ASAuthoriz
         if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
             finish(.success(credential))
         } else {
-            finish(.failure(LifestyleAPI.ClientError.missingAppleToken))
+            finish(.failure(HearthAPI.ClientError.missingAppleToken))
         }
     }
 

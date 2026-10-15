@@ -11,6 +11,10 @@ struct HouseholdView: View {
     @State private var showsNew = false
     @State private var household = HouseholdSync.shared
     @State private var confirmsLeave = false
+    @Environment(\.modelContext) private var context
+    /// Caloma's parents, offered when no one's been added yet (onboarding was skipped).
+    @State private var calomaParents: [String] = []
+    @AppStorage(CalomaFamily.dismissedKey) private var calomaDismissed = false
 
     var body: some View {
         List {
@@ -29,6 +33,12 @@ struct HouseholdView: View {
                     .tint(.primary)
                 }
                 Button("Add Person", systemImage: "person.badge.plus") { showsNew = true }
+                // Not for someone who joined a household: its people arrive with the sync.
+                if members.isEmpty, !household.isMember, !calomaDismissed, !calomaParents.isEmpty {
+                    Button("Add \(Array(calomaParents.prefix(2)).formatted(.list(type: .and))) from Caloma", systemImage: "person.2.badge.plus") {
+                        addCalomaParents()
+                    }
+                }
             } footer: {
                 if household.isMember && currentMember.isEmpty {
                     Text("Tap your name and turn on This is me, so your transactions show your badge.")
@@ -43,6 +53,7 @@ struct HouseholdView: View {
         }
         .navigationTitle("Household")
         .task { await household.refreshShare() }
+        .onAppear { calomaParents = CalomaFamily.parentNames() }
         .confirmationDialog("Leave the household?", isPresented: $confirmsLeave, titleVisibility: .visible) {
             Button("Leave Household", role: .destructive) {
                 Task { await household.leaveHousehold() }
@@ -60,6 +71,16 @@ struct HouseholdView: View {
 }
 
 extension HouseholdView {
+    /// Adds Caloma's first two parents, in onboarding's colors. Tap your name afterwards and
+    /// turn on This is me.
+    private func addCalomaParents() {
+        let colors: [MemberColor] = [.green, .purple]
+        for (index, name) in calomaParents.prefix(2).enumerated() {
+            context.insert(Member(name: name, color: colors[index], sortOrder: index))
+        }
+        try? context.save()
+    }
+
     /// Invite your partner (owner), see who's in, or leave (member).
     @ViewBuilder
     private var sharingSection: some View {
