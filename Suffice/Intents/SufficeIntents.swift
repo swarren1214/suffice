@@ -315,8 +315,6 @@ nonisolated struct AskSufficeIntent: AppIntent {
 
 /// What you can say to Siri without setting anything up. Every phrase names the app.
 nonisolated struct SufficeShortcuts: AppShortcutsProvider {
-    static let shortcutTileColor: ShortcutTileColor = .grassGreen
-
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: BudgetLeftIntent(),

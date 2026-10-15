@@ -20,8 +20,8 @@ enum Persistence {
     private(set) static var startedFresh = false
 
     /// The app's one store, shared by the app and its Siri and Shortcuts actions (which can run
-    /// before any window opens).
-    static let shared = makeContainer()
+    /// before any window opens). In memory in screenshot mode, so the real budget is never touched.
+    static let shared = makeContainer(inMemory: ScreenshotMode.isOn)
 
     static func makeContainer(inMemory: Bool = false) -> ModelContainer {
         // The store itself is local. Household sync (Services/Household) carries it to iCloud

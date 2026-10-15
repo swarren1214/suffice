@@ -20,7 +20,10 @@ struct MerchantLogoImage: View {
     }
 
     var body: some View {
-        Group {
+        // A clear placeholder holds the space until the logo loads: on an empty view SwiftUI
+        // never runs `.task`, so the download would never start.
+        ZStack {
+            Color.clear
             if let image {
                 Image(uiImage: image)
                     .resizable()
@@ -32,6 +35,8 @@ struct MerchantLogoImage: View {
                     .transition(.opacity)
             }
         }
+        .frame(width: size, height: size)
+        .allowsHitTesting(false)
         .task(id: url) {
             guard image == nil else { return }
             let loaded = await LogoStore.shared.image(for: url)

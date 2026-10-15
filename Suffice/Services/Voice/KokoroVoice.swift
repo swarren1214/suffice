@@ -197,6 +197,7 @@ final class KokoroModel: NSObject {
 
     /// Starts the download. `wifiOnly` keeps it off cellular (used when it starts on its own).
     func download(wifiOnly: Bool = false) {
+        guard !ScreenshotMode.isOn else { return }
         // Another of the apps may already have it.
         refresh()
         // Marked broken after a failed load, but the file is here: try loading it again rather

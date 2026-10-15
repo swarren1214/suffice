@@ -17,14 +17,6 @@ struct ActivityView: View {
                     Label("Filter", systemImage: filter == .all ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
                         .foregroundStyle(.white)
                 }
-                Button {
-                    var draft = EntryDraft()
-                    draft.date = router.entryDate
-                    newDraft = DraftItem(draft: draft)
-                } label: {
-                    Label("Add Transaction", systemImage: "plus")
-                        .foregroundStyle(.white)
-                }
             }
             .sheet(item: $newDraft) { item in
                 TransactionSheet(entry: nil, initial: item.draft)

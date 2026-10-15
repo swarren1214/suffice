@@ -368,6 +368,11 @@ struct AboutView: View {
                 ShareLink(item: CSVExport(text: csv), preview: SharePreview("Suffice transactions")) {
                     Label("Export Transactions as CSV", systemImage: "square.and.arrow.up")
                 }
+                NavigationLink {
+                    LogoCheckView()
+                } label: {
+                    Label("Check Logos", systemImage: "photo.badge.checkmark")
+                }
             } footer: {
                 Text("Your budget lives on this iPhone and in your private iCloud. Suffice has no servers and can't see your data.")
             }

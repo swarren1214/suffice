@@ -23,7 +23,22 @@ final class ConversationAudio {
     private var isStarting = false
     /// Microphone audio goes here, on the audio thread.
     private let sink = OSAllocatedUnfairLock<(@Sendable (AVAudioPCMBuffer) -> Void)?>(initialState: nil)
+    /// When the microphone last delivered real sound (not digital silence), from the audio thread.
+    private let lastSignal = OSAllocatedUnfairLock(initialState: Date.distantPast)
+    private var configurationObserver: NSObjectProtocol?
+    private var watchdog: Task<Void, Never>?
     private let log = Logger(subsystem: "com.stephenwarren.suffice", category: "conversation")
+
+    private init() {
+        // Switching the audio session to two-way voice (and turning on echo cancellation)
+        // reconfigures the hardware a moment after the engine starts, which stops the engine.
+        // The first conversation after launch always hits this; restart instead of going deaf.
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.restart(reason: "the audio configuration changed", full: false, attempt: 1) }
+        }
+    }
 
     /// Opens the microphone and Suffice's voice. `input` receives microphone audio on a
     /// background thread.
@@ -33,7 +48,19 @@ final class ConversationAudio {
         isStarting = true
         defer { isStarting = false }
         try await AudioSessionControl.activateForConversation()
+        do {
+            try startEngine()
+        } catch {
+            engine.inputNode.removeTap(onBus: 0)
+            AudioSessionControl.deactivate()
+            throw error
+        }
+        isRunning = true
+        watchMicrophone()
+    }
 
+    /// Echo cancellation on, the player attached, the microphone tapped, and the engine started.
+    private func startEngine() throws {
         let microphone = engine.inputNode
         #if !targetEnvironment(simulator)
         do {
@@ -50,24 +77,82 @@ final class ConversationAudio {
             engine.connect(player, to: engine.mainMixerNode, format: format)
             attached = true
         }
-        let sink = self.sink
+        tapMicrophone()
+        engine.prepare()
+        try engine.start()
+    }
+
+    /// (Re)installs the tap with the microphone's current format, which can change when the
+    /// hardware is reconfigured.
+    private func tapMicrophone() {
+        let microphone = engine.inputNode
         microphone.removeTap(onBus: 0)
+        let sink = self.sink
+        let lastSignal = self.lastSignal
         Self.installTap(on: microphone) { buffer in
+            if Self.hasSound(buffer) { lastSignal.withLock { $0 = .now } }
             sink.withLock { $0 }?(buffer)
         }
-        engine.prepare()
-        do {
-            try engine.start()
-        } catch {
-            microphone.removeTap(onBus: 0)
-            AudioSessionControl.deactivate()
-            throw error
+    }
+
+    /// Restarts after the engine stopped on its own, or went silent. `full` also resets echo
+    /// cancellation, which on some first starts delivers nothing but zeros.
+    private func restart(reason: String, full: Bool, attempt: Int) {
+        guard isRunning, !isStarting else { return }
+        log.notice("Restarting the microphone: \(reason, privacy: .public)")
+        if full || !engine.isRunning {
+            engine.stop()
         }
-        isRunning = true
+        if full, hasVoiceProcessing {
+            engine.inputNode.removeTap(onBus: 0)
+            try? engine.inputNode.setVoiceProcessingEnabled(false)
+            hasVoiceProcessing = false
+        }
+        do {
+            if full {
+                try startEngine()
+            } else {
+                tapMicrophone()
+                engine.prepare()
+                try engine.start()
+            }
+        } catch {
+            log.error("Couldn't restart the microphone: \(error.localizedDescription, privacy: .public)")
+        }
+        watchMicrophone(attempt: attempt)
+    }
+
+    /// If no real sound comes in soon after starting, starts over: first just the engine, then
+    /// with a full reset. After that it stops trying (the microphone may be in use elsewhere).
+    private func watchMicrophone(attempt: Int = 1) {
+        watchdog?.cancel()
+        guard attempt <= 2 else { return }
+        let started = Date.now
+        watchdog = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(1200))
+            guard !Task.isCancelled, let self, self.isRunning else { return }
+            if self.lastSignal.withLock({ $0 }) > started { return }
+            self.log.notice("No microphone audio after starting (attempt \(attempt))")
+            self.restart(reason: "no sound from the microphone", full: attempt == 2, attempt: attempt + 1)
+        }
+    }
+
+    /// Real microphones always pick up a little noise; exact zeros mean no audio is flowing.
+    private nonisolated static func hasSound(_ buffer: AVAudioPCMBuffer) -> Bool {
+        guard let samples = buffer.floatChannelData?[0] else { return true }
+        let count = Int(buffer.frameLength)
+        var index = 0
+        while index < count {
+            if samples[index] != 0 { return true }
+            index += 8
+        }
+        return false
     }
 
     func stop() {
         sink.withLock { $0 = nil }
+        watchdog?.cancel()
+        watchdog = nil
         guard isRunning else { return }
         player.stop()
         engine.inputNode.removeTap(onBus: 0)
@@ -161,6 +246,14 @@ final class AskConversation {
 
     func start(with engine: AskEngine) async {
         self.engine = engine
+        // Screenshot mode: the last exchange, being spoken, without the microphone or speech
+        // recognition (so no permission prompts).
+        if ScreenshotMode.isOn {
+            question = engine.messages.last { $0.role == .user }?.text ?? ""
+            replyID = engine.messages.last { $0.role == .assistant }?.id
+            phase = .speaking
+            return
+        }
         phase = .starting
         speaker.stop()
         guard await Self.permissionsGranted() else {

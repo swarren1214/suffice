@@ -94,19 +94,32 @@ enum BankSync {
         let me = UserDefaults.standard.string(forKey: SettingsKey.appleUserID) ?? ""
         let banks = ((try? context.fetch(FetchDescriptor<LinkedBank>())) ?? [])
             .filter { $0.connectedByAppleID.isEmpty || $0.connectedByAppleID == me }
+        // Once: fetch every transaction again so ones saved before logos and places were
+        // filled in get them (see `backfill`).
+        let refreshing = !UserDefaults.standard.bool(forKey: detailsRefreshKey)
+        var allSynced = true
         for bank in banks where !bank.needsReconnect {
+            if refreshing { bank.cursor = "" }
             do {
                 try await sync(bank, memberID: memberID, in: context)
             } catch {
+                allSynced = false
                 log.error("Sync failed for \(bank.institution, privacy: .public): \(error.localizedDescription, privacy: .public)")
             }
         }
+        if refreshing, allSynced, !banks.isEmpty {
+            UserDefaults.standard.set(true, forKey: detailsRefreshKey)
+        }
     }
 
-    /// On opening the app: sync when it's been more than an hour.
+    /// Bump the version to fetch every transaction again once more on each device.
+    private static let detailsRefreshKey = "bankSync.detailsRefreshed.v1"
+
+    /// On opening the app: sync when it's been more than an hour (or a one-time refresh is due).
     static func syncAllIfStale(memberID: UUID?, in context: ModelContext) async {
         let banks = (try? context.fetch(FetchDescriptor<LinkedBank>())) ?? []
-        guard banks.contains(where: { ($0.lastSynced ?? .distantPast) < Date.now.addingTimeInterval(-3600) }) else { return }
+        let refreshDue = !UserDefaults.standard.bool(forKey: detailsRefreshKey) && !banks.isEmpty
+        guard refreshDue || banks.contains(where: { ($0.lastSynced ?? .distantPast) < Date.now.addingTimeInterval(-3600) }) else { return }
         await syncAll(memberID: memberID, in: context)
     }
 
@@ -126,6 +139,11 @@ enum BankSync {
             },
             uniquingKeysWith: { first, _ in first }
         )
+
+        // Already here (a full refresh sends everything again): fill in only what's missing.
+        for transaction in page.added {
+            if let entry = existing[transaction.id] { backfill(entry, from: transaction) }
+        }
 
         for transaction in page.added where existing[transaction.id] == nil {
             let entry = LedgerEntry(
@@ -167,6 +185,20 @@ enum BankSync {
         bank.lastSynced = .now
         bank.needsReconnect = false
         try? context.save()
+    }
+
+    /// Fills in the logo and place on a transaction saved without them. Never changes what's
+    /// there, so people's edits stay.
+    private static func backfill(_ entry: LedgerEntry, from transaction: BankTransaction) {
+        if entry.logoURL == nil {
+            entry.logoURL = MerchantLogo.url(plaidLogo: transaction.logoUrl, domain: transaction.merchantDomain)?.absoluteString
+        }
+        if entry.placeName == nil { entry.placeName = transaction.city }
+        if entry.placeAddress == nil { entry.placeAddress = transaction.address }
+        if entry.latitude == nil, entry.longitude == nil {
+            entry.latitude = transaction.latitude
+            entry.longitude = transaction.longitude
+        }
     }
 
     /// Retries once after Sign in with Apple when the API says banking needs it.

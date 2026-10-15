@@ -186,7 +186,7 @@ final class AskEngine {
     }
 
     func prewarm() {
-        guard availability == .available, session == nil, data != nil else { return }
+        guard availability == .available, session == nil, data != nil, !ScreenshotMode.isOn else { return }
         let session = makeSession()
         session?.prewarm()
         self.session = session
@@ -305,5 +305,15 @@ final class AskEngine {
     func reset() {
         messages = []
         session = nil
+    }
+}
+
+// MARK: - Screenshot mode
+
+extension AskEngine {
+    /// Screenshot mode: shows a finished conversation without asking the model.
+    func showScreenshotConversation(_ seeded: [AskMessage]) {
+        guard ScreenshotMode.isOn else { return }
+        messages = seeded
     }
 }

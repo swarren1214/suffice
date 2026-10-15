@@ -67,7 +67,9 @@ enum OnDeviceModel {
     }
 
     static var availability: Availability {
-        switch SystemLanguageModel.default.availability {
+        // Screenshot mode shows Ask as it looks where Apple Intelligence is on.
+        if ScreenshotMode.isOn { return .available }
+        return switch SystemLanguageModel.default.availability {
         case .available: .available
         case .unavailable(.appleIntelligenceNotEnabled): .notEnabled
         case .unavailable(.modelNotReady): .notReady

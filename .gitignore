@@ -6,3 +6,4 @@ build/
 
 # Local Swift packages
 .swiftpm/
+/screenshots/

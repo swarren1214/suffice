@@ -150,32 +150,45 @@ struct AskButton: View {
             Button {
                 router.showsAsk = true
             } label: {
-                Image(systemName: "sparkles")
+                // Titled, so it reads right if it's folded into the bar's "…" menu.
+                Label("Ask Suffice", systemImage: "sparkles")
                     .foregroundStyle(.white)
             }
-            .accessibilityLabel("Ask Suffice")
         }
     }
 }
 
-/// The signed-in person's photo (or initial) at the top right. Opens Profile.
+/// The signed-in person's photo (or initial) at the top right. Opens Profile. If the bar runs
+/// out of room and folds it into its "…" menu, it reads "View Profile" with a profile icon.
 struct ProfileButton: View {
     @Query(sort: \Member.sortOrder) private var members: [Member]
     @AppStorage(SettingsKey.currentMember) private var currentMember = ""
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         NavigationLink {
             ProfileView()
         } label: {
-            if let me = members.first(where: { $0.id.uuidString == currentMember }) {
-                PersonAvatar(member: me, size: 30)
-            } else {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.white)
+            Label {
+                Text("View Profile")
+            } icon: {
+                if let avatar {
+                    avatar.renderingMode(.original)
+                } else {
+                    Image(systemName: "person.crop.circle.fill")
+                        .foregroundStyle(.white)
+                }
             }
         }
         .accessibilityLabel("Profile")
+    }
+
+    /// Your avatar drawn into an image, so the menu can show it too (menus only show images).
+    private var avatar: Image? {
+        guard let me = members.first(where: { $0.id.uuidString == currentMember }) else { return nil }
+        let renderer = ImageRenderer(content: PersonAvatar(member: me, size: 30))
+        renderer.scale = displayScale
+        return renderer.uiImage.map { Image(uiImage: $0) }
     }
 }
 
@@ -188,9 +201,11 @@ extension View {
                 MonthMenu()
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
-                AskButton()
-                action()
-                ProfileButton()
+                // White icons, also in the "…" menu if the bar runs out of room (the app's tint
+                // is green, which made menu icons green beside white text).
+                AskButton().tint(.white)
+                action().tint(.white)
+                ProfileButton().tint(.white)
             }
         }
     }

@@ -18,6 +18,8 @@ enum WidgetSync {
     }
 
     static func refresh(_ context: ModelContext, now: Date = .now) {
+        // Screenshot mode's demo household stays out of the widgets and the watch.
+        guard !ScreenshotMode.isOn else { return }
         let snapshot = makeSnapshot(context, now: now)
         if WidgetStore.save(snapshot) {
             WidgetCenter.shared.reloadAllTimelines()

@@ -10,12 +10,16 @@ enum AppTab: Hashable {
 struct RootTabView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.horizontalSizeClass) private var sizeClass
+    /// Only screenshot mode pushes onto it (Profile and Household).
+    @State private var overviewPath = NavigationPath()
 
     var body: some View {
         @Bindable var router = router
         TabView(selection: $router.tab) {
             Tab(value: AppTab.overview) {
-                NavigationStack { OverviewView() }
+                NavigationStack(path: $overviewPath) {
+                    OverviewView().screenshotDestinations()
+                }
             } label: {
                 tabIcon("Overview", "square.grid.2x2")
             }
@@ -51,6 +55,7 @@ struct RootTabView: View {
         .sheet(isPresented: $router.showsAsk) {
             AskView()
         }
+        .screenshotStage(overviewPath: $overviewPath)
     }
 
     /// Icon only in the iPhone tab bar (VoiceOver still reads the name); icon and name on

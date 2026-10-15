@@ -10,12 +10,18 @@ struct SufficeApp: App {
     private let container: ModelContainer
 
     init() {
+        ScreenshotMode.prepareLaunch()
         let container = Persistence.shared
         self.container = container
-        StarterData.seedIfNeeded(in: container.mainContext)
-        // Fold together anything two devices both made, then sync the household with iCloud.
-        SyncCleanup.mergeDuplicates(in: container.mainContext)
-        HouseholdSync.shared.start(container)
+        if ScreenshotMode.isOn {
+            // The demo household is seeded by RootTabView's screenshot stage; nothing syncs.
+            HouseholdSync.shared.startForScreenshots()
+        } else {
+            StarterData.seedIfNeeded(in: container.mainContext)
+            // Fold together anything two devices both made, then sync the household with iCloud.
+            SyncCleanup.mergeDuplicates(in: container.mainContext)
+            HouseholdSync.shared.start(container)
+        }
         // Alerts use the system label color rather than the brand green. Destructive buttons stay red.
         UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self]).tintColor = .label
         // Switches use the designs' bright green.
@@ -35,7 +41,7 @@ struct SufficeApp: App {
         WindowGroup {
             AppRoot()
                 .background(KeyboardDismissal().frame(width: 0, height: 0))
-                .task { await LifestyleAPI.shared.prepareSession() }
+                .task { if !ScreenshotMode.isOn { await LifestyleAPI.shared.prepareSession() } }
                 .environment(router)
                 .environment(lock)
         }

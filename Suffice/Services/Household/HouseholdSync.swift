@@ -159,6 +159,7 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
     }
 
     func refreshAccount() async {
+        guard !ScreenshotMode.isOn else { return }
         do {
             account = switch try await container.accountStatus() {
             case .available: .available
@@ -546,6 +547,7 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
     }
 
     func refreshShare() async {
+        guard !ScreenshotMode.isOn else { return }
         let shareID = CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zoneID)
         let database = isMember ? container.sharedCloudDatabase : container.privateCloudDatabase
         do {
@@ -881,6 +883,17 @@ private enum SchemaSamples {
     }
 }
 #endif
+
+// MARK: - Screenshot mode
+
+extension HouseholdSync {
+    /// Screenshot mode: iCloud signed in and just synced, without starting either sync engine.
+    func startForScreenshots() {
+        guard ScreenshotMode.isOn else { return }
+        account = .available
+        lastSynced = .now.addingTimeInterval(-90)
+    }
+}
 
 // MARK: - Sharing controller
 
