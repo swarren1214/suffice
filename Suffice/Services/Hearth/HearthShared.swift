@@ -261,7 +261,10 @@ nonisolated struct HearthMealPlan: HearthPublication, Hashable {
         /// "recipe", "custom" or "dineOut".
         var kind: String
         var recipeIDs: [String]?
+        /// The recipe's photo (the main dish's, when there are several), as an https URL.
         var imageURL: String?
+        /// The restaurant's logo when eating out (img.logo.dev), as an https URL.
+        var logoURL: String?
         /// Where, when eating out.
         var placeName: String?
         /// Names of the people not eating this meal.
@@ -298,6 +301,43 @@ nonisolated struct HearthMealPlan: HearthPublication, Hashable {
 
     func meal(_ slot: String, on date: Date, calendar: Calendar = .current) -> Meal? {
         day(date, calendar: calendar)?.meals.first { $0.slot == slot }
+    }
+}
+
+// MARK: - Meal times
+
+/// When the family eats, set in BigTable or Caloma and shared both ways: each app saves the
+/// times when they're changed there, and every app uses the newest copy (`current`). BigTable
+/// plans meals, not times; Caloma puts them on the calendar at these times.
+nonisolated struct HearthMealTimes: HearthPublication, Hashable {
+    static let kind = "meal-times"
+    static let version = 1
+
+    /// Minutes after midnight.
+    var breakfast: Int
+    var lunch: Int
+    var dinner: Int
+
+    static let standard = HearthMealTimes(breakfast: 8 * 60, lunch: 12 * 60, dinner: 18 * 60)
+
+    /// The newest times any Hearth app saved, or 8 AM, noon and 6 PM.
+    static var current: HearthMealTimes {
+        Hearth.readAll(HearthMealTimes.self).first?.value ?? .standard
+    }
+
+    /// For "breakfast", "lunch" or "dinner".
+    func minutes(for slot: String) -> Int {
+        switch slot {
+        case "breakfast": breakfast
+        case "lunch": lunch
+        default: dinner
+        }
+    }
+
+    /// The meal's time on that day.
+    func start(for slot: String, on day: Date, calendar: Calendar = .current) -> Date {
+        let minutes = minutes(for: slot)
+        return calendar.date(bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: day) ?? day
     }
 }
 
