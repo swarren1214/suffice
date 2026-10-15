@@ -76,7 +76,7 @@ extension HouseholdView {
     private func addCalomaParents() {
         let colors: [MemberColor] = [.green, .purple]
         for (index, name) in calomaParents.prefix(2).enumerated() {
-            context.insert(Member(name: name, color: colors[index], sortOrder: index))
+            context.insert(Member(name: name, color: colors[index], photoData: CalomaFamily.parentPhoto(named: name), sortOrder: index))
         }
         try? context.save()
     }

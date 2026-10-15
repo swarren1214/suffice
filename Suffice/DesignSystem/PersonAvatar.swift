@@ -2,8 +2,9 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
-/// A person's round avatar: their photo when they have one, otherwise their initial on their
-/// pale color. Used everywhere a household member appears.
+/// A person's round avatar: their photo when they have one, otherwise a photo another Hearth
+/// app has of someone with their name (`HearthPhotos`), otherwise their initial on their pale
+/// color. Used everywhere a household member appears.
 struct PersonAvatar: View {
     var name: String
     var color: MemberColor
@@ -12,7 +13,7 @@ struct PersonAvatar: View {
 
     var body: some View {
         Group {
-            if let image = MemberPhoto.image(from: photo) {
+            if let image = MemberPhoto.image(from: photo) ?? (photo == nil ? HearthPhotos.shared.image(forName: name) : nil) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()

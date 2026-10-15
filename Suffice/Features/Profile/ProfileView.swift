@@ -164,9 +164,9 @@ struct ProfileView: View {
             if cloud.isMember {
                 Text("You’re in a shared household, so erasing would delete it for everyone. Leaving removes it from this \(DeviceName.current) and brings back your own budget.")
             } else if cloud.isSharing {
-                Text("This disconnects your banks and removes every transaction, budget, bill, account and person from your devices, your iCloud and everyone you share the household with. It can't be undone.")
+                Text("This disconnects your banks and removes every transaction, budget, bill, account and person from your devices, your iCloud and everyone you share the household with. It can't be undone.\(appleUserID.isEmpty ? "" : " You’ll also be signed out of the other Hearth apps on this \(DeviceName.current).")")
             } else {
-                Text("This disconnects your banks and removes every transaction, budget, bill, account and person from this device\(AppConfig.cloudSyncEnabled ? " and your iCloud" : ""). It can't be undone.")
+                Text("This disconnects your banks and removes every transaction, budget, bill, account and person from this device\(AppConfig.cloudSyncEnabled ? " and your iCloud" : ""). It can't be undone.\(appleUserID.isEmpty ? "" : " You’ll also be signed out of the other Hearth apps on this \(DeviceName.current).")")
             }
         }
     }
@@ -206,9 +206,11 @@ private struct ProfileSignIn: View {
                     let token = credential.identityToken
                     let requestNonce = nonce
                     let userID = credential.user
+                    let fullName = credential.fullName
+                    let email = credential.email
                     Task { @MainActor in
                         do {
-                            try await HearthAPI.shared.signInWithApple(identityToken: token, nonce: requestNonce)
+                            try await HearthAPI.shared.signInWithApple(identityToken: token, nonce: requestNonce, appleUserID: userID, fullName: fullName, email: email)
                             withAnimation { appleUserID = userID }
                             // Banks you connected on another device start syncing here too.
                             await BankSync.syncAll(memberID: UUID(uuidString: currentMember), in: context)

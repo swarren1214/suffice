@@ -186,6 +186,8 @@ struct ProfileButton: View {
     /// Your avatar drawn into an image, so the menu can show it too (menus only show images).
     private var avatar: Image? {
         guard let me = members.first(where: { $0.id.uuidString == currentMember }) else { return nil }
+        // Redraw when another Hearth app shares a photo (used when you have none here).
+        _ = HearthPhotos.shared.generation
         let renderer = ImageRenderer(content: PersonAvatar(member: me, size: 30))
         renderer.scale = displayScale
         return renderer.uiImage.map { Image(uiImage: $0) }

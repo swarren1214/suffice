@@ -85,7 +85,7 @@ Entertainment (Streaming, Date night) and Giving.
 - **Names from Caloma:** when Caloma is on the iPhone and has shared its family, Who's
   budgeting? offers "Use names from Caloma?" (its parents) while the partner's name is empty and
   yours is empty or one of them; × hides it for good. Profile › Household offers "Add … from
-  Caloma" if no one's been added yet. Read through the Hearth app group
+  Caloma" if no one's been added yet. Both bring Caloma's photo of each parent along. Read through the Hearth app group
   `group.com.stephenwarren.hearth` (`Services/CalomaFamily.swift`, `Services/Hearth/`; the app
   target only, and tick App Groups › that group under Signing & Capabilities). Off in screenshot
   mode.
@@ -261,6 +261,26 @@ Suffice silently creates a Supabase anonymous session for non-banking calls to t
 Hearth API (`Services/HearthAPI.swift`, base URL and keys in `AppConfig`). Sign in with
 Apple (onboarding, or the first time someone taps Connect a Bank) replaces it with a durable
 Supabase identity; banking refuses anonymous sessions.
+
+**One sign-in for every Hearth app.** BigTable, Suffice and Sated use the same Supabase project,
+so a signed-in session is shared through `HearthAccounts` (Keychain, access group
+`group.com.stephenwarren.hearth`; see `HearthSharedSession` in `Services/Hearth/HearthShared.swift`).
+Anonymous sessions are never shared. Suffice adopts the shared session when it has none or only
+an anonymous one; publishes its own if it was signed in before sharing existed; re-reads the
+shared one before spending a refresh token (another app may have refreshed already) and keeps
+whichever token expires later; and saves the session and the Apple user (name and email, which
+Apple only sends the first time) after signing in or refreshing. Erase App Data signs out of
+every Hearth app on the device. When another app signs out or switches person, Suffice follows
+on `Hearth.didChange` or when it becomes active (`HearthSignIn`), going back to anonymous and
+clearing `SettingsKey.appleUserID`. A refresh token Supabase rejects is remembered (as a hash)
+so the dead session isn't adopted again. Off in screenshot mode.
+
+**People's photos.** `Services/HearthHousehold.swift` publishes the household as Suffice's
+`HearthFamily` (everyone as an adult, badge ink color, `me` = This is me, photos as shared JPEGs)
+after saves (debounced, like the widgets), on launch and when the app becomes active, then
+removes photos it no longer uses. Anyone without a photo here shows the photo another Hearth
+app has of someone with the same name (`HearthPhotos`, cached by name, cleared on
+`Hearth.didChange`). Off in screenshot mode.
 
 Banks connect through Plaid (`Services/BankSync/`, LinkKit 7 via Swift Package Manager):
 

@@ -26,7 +26,13 @@ final class AppleSignIn: NSObject, ASAuthorizationControllerDelegate, ASAuthoriz
             controller.presentationContextProvider = helper
             controller.performRequests()
         }
-        try await HearthAPI.shared.signInWithApple(identityToken: credential.identityToken, nonce: helper.nonce)
+        try await HearthAPI.shared.signInWithApple(
+            identityToken: credential.identityToken,
+            nonce: helper.nonce,
+            appleUserID: credential.user,
+            fullName: credential.fullName,
+            email: credential.email
+        )
         UserDefaults.standard.set(credential.user, forKey: SettingsKey.appleUserID)
     }
 

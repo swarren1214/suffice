@@ -83,12 +83,17 @@ private struct WelcomeView: View {
                             let token = credential.identityToken
                             let nonce = appleNonce
                             let userID = credential.user
-                            let name = credential.fullName?.givenName
+                            let fullName = credential.fullName
+                            let email = credential.email
                             Task { @MainActor in
                                 do {
-                                    try await HearthAPI.shared.signInWithApple(identityToken: token, nonce: nonce)
+                                    try await HearthAPI.shared.signInWithApple(identityToken: token, nonce: nonce, appleUserID: userID, fullName: fullName, email: email)
                                     appleUserID = userID
-                                    if let name, !name.isEmpty { givenName = name }
+                                    // Apple only sends the name the first time; another Hearth app
+                                    // may have kept it.
+                                    let sharedFirst = HearthAPI.sharedAppleName(for: userID)?
+                                        .split(separator: " ").first.map(String.init)
+                                    if let name = fullName?.givenName ?? sharedFirst, !name.isEmpty { givenName = name }
                                     withAnimation { signedIn = true }
                                 } catch {
                                     errorMessage = error.localizedDescription
@@ -258,7 +263,11 @@ private struct HouseholdSetupView: View {
             Button("Use") {
                 withAnimation {
                     myName = suggestion.mine
-                    if let partner = suggestion.partner { partnerName = partner }
+                    if myPhoto == nil { myPhoto = CalomaFamily.parentPhoto(named: suggestion.mine) }
+                    if let partner = suggestion.partner {
+                        partnerName = partner
+                        if partnerPhoto == nil { partnerPhoto = CalomaFamily.parentPhoto(named: partner) }
+                    }
                 }
             }
             .buttonStyle(.borderedProminent)

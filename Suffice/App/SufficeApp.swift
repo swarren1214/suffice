@@ -29,10 +29,17 @@ struct SufficeApp: App {
         AppLock.shared.lockIfEnabled()
         // Keep the widgets current: every save rewrites their snapshot (debounced).
         NotificationCenter.default.addObserver(forName: ModelContext.didSave, object: nil, queue: .main) { _ in
-            MainActor.assumeIsolated { WidgetSync.schedule(container) }
+            MainActor.assumeIsolated {
+                WidgetSync.schedule(container)
+                // The other Hearth apps get the household's names and photos.
+                HearthHousehold.schedule(container)
+            }
         }
         WatchSync.shared.start()
         WidgetSync.refresh(container.mainContext)
+        // One sign-in for every Hearth app: follow sign-ins and sign-outs in BigTable and Sated.
+        HearthSignIn.start()
+        HearthHousehold.start(container)
         // Siri learns the current budget and bill names for its phrases.
         SufficeShortcuts.updateAppShortcutParameters()
     }
@@ -201,6 +208,8 @@ struct AppRoot: View {
                 // A new day changes which bills are due and late.
                 WidgetSync.refresh(context)
                 Task { await household.syncNow() }
+                Task { await HearthSignIn.follow() }
+                HearthHousehold.publish(in: context)
                 // Connected banks, at most hourly.
                 Task {
                     await BankSync.syncAllIfStale(
