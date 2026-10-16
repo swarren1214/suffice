@@ -76,13 +76,16 @@ struct ReceiptSection: View {
                     Button { request(.camera) } label: {
                         Label("Scan", systemImage: "camera.viewfinder")
                             .fontWeight(.semibold)
+                            // White icon and text: left to the tint, the icon came out green on
+                            // the green button.
+                            .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassProminent)
                     .tint(Brand.green)
                 }
                 Button { request(.library) } label: {
-                    Label("Photos", systemImage: "photo.on.rectangle")
+                    Label("Upload", systemImage: "square.and.arrow.up")
                         .fontWeight(.semibold)
                         .foregroundStyle(Brand.green)
                         .frame(maxWidth: .infinity)
@@ -134,7 +137,7 @@ struct ReceiptSection: View {
                     if ReceiptCamera.isAvailable {
                         Button("Scan a New One", systemImage: "camera.viewfinder") { request(.camera) }
                     }
-                    Button("Choose a New Photo", systemImage: "photo.on.rectangle") { request(.library) }
+                    Button("Upload a New One", systemImage: "square.and.arrow.up") { request(.library) }
                     Divider()
                     Button("Remove Receipt", systemImage: "trash", role: .destructive) {
                         withAnimation(.snappy) { receipt = nil }

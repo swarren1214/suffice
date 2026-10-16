@@ -45,6 +45,8 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
     private(set) var isSyncing = false
     private(set) var lastSynced: Date?
     private(set) var lastError: String?
+    /// Why the last try at joining a household failed, for the invite screen.
+    private(set) var joinError: String?
     /// An invitation waiting for the person to say yes (see AppRoot's alert).
     var pendingInvite: CKShare.Metadata?
     private(set) var isWorking = false
@@ -598,17 +600,26 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
         return name.isEmpty ? "your partner" : name
     }
 
-    func acceptInvite() async {
-        guard let metadata = pendingInvite else { return }
-        pendingInvite = nil
+    /// Joins the household in `invite`, or the pending invitation. The invitation stays
+    /// pending until joining works, so a failure (offline, say) can be tried again.
+    func acceptInvite(_ invite: CKShare.Metadata? = nil) async {
+        guard let metadata = invite ?? pendingInvite else { return }
         isWorking = true
+        joinError = nil
         defer { isWorking = false }
         do {
             // Everything of yours still waiting goes up first, so it's there if you leave.
             sendLocalChanges()
             try await privateEngine?.sendChanges()
             _ = try await container.accept(metadata)
-            becomeMember(ownerName: metadata.share.recordID.zoneID.ownerName)
+        } catch {
+            note(error)
+            joinError = Self.describe(error)
+            return
+        }
+        pendingInvite = nil
+        becomeMember(ownerName: metadata.share.recordID.zoneID.ownerName)
+        do {
             try await sharedEngine?.fetchChanges()
         } catch {
             note(error)
@@ -641,6 +652,7 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
         role = .member(ownerName: ownerName)
         share = nil
         UserDefaults.standard.removeObject(forKey: SettingsKey.currentMember)
+        UserDefaults.standard.removeObject(forKey: SettingsKey.askedWhoAmI)
         UserDefaults.standard.set(true, forKey: SettingsKey.onboarded)
         // Start the shared side from scratch so every record arrives. (Queued saves for the
         // wiped records drop out when they're sent; queued deletions still go.)

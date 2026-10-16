@@ -117,6 +117,10 @@ final class LedgerEntry {
     var externalID: String?
     /// The merchant's logo for bank-synced transactions (Plaid's, or Logo.dev's by domain).
     var logoURL: String?
+    /// Plaid's category for a bank-synced transaction ("FOOD_AND_DRINK_GROCERIES", or just
+    /// "FOOD_AND_DRINK" from older API versions). Only this device's own bank transactions have
+    /// one; it isn't synced. Onboarding uses it to suggest budget amounts and find bills.
+    var bankCategory: String?
     /// A photo of the receipt (a JPEG, scanned or picked in the transaction sheet). Stored
     /// outside the database file; household sync carries it as an asset.
     @Attribute(.externalStorage) var receiptData: Data?

@@ -15,6 +15,13 @@
 	</array>
 	<key>CKSharingSupported</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>bigtable</string>
+		<string>sated</string>
+		<string>caloma</string>
+		<string>hearken</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

@@ -2,147 +2,362 @@ import AuthenticationServices
 import SwiftData
 import SwiftUI
 
-/// First run: Welcome, Connect accounts, then who's in the household.
+/// First run, from the "Suffice Onboarding & Tour" designs: Welcome, then six steps that end
+/// with a real plan (who's budgeting, inviting your partner, accounts, the month's plan, bills,
+/// reminders) and All set. "I Have an Invite" on Welcome is the partner's way in instead.
 ///
-/// Signing in is optional. Everything works without it (App Review rejects apps that hold
-/// features behind a sign-in they don't need); Sign in with Apple adds a durable identity for bank connections.
+/// Onboarding is always dark, like the designs. Every step after Welcome can be skipped;
+/// nothing is required but your name.
 struct OnboardingView: View {
     @AppStorage(SettingsKey.onboarded) private var onboarded = false
-    @State private var step = 1
-    @State private var givenName = ""
+    @State private var flow = OnboardingFlow()
+    @State private var household = HouseholdSync.shared
 
     var body: some View {
-        Group {
-            switch step {
-            case 1:
-                WelcomeView(givenName: $givenName) { withAnimation(.smooth) { step = 2 } }
-            case 2:
-                ConnectView(step: (2, 3)) { withAnimation(.smooth) { step = 3 } }
-            default:
-                HouseholdSetupView(givenName: givenName) { onboarded = true }
-            }
+        ZStack {
+            Color.black.ignoresSafeArea()
+            screen
+                .id(flow.screen)
+                .transition(.asymmetric(
+                    insertion: .move(edge: flow.isForward ? .trailing : .leading).combined(with: .opacity),
+                    removal: .move(edge: flow.isForward ? .leading : .trailing).combined(with: .opacity)
+                ))
         }
-        .transition(.opacity)
+        .environment(flow)
+        .environment(\.colorScheme, .dark)
+        .tint(OnboardingStyle.accent)
+        // Someone tapped a household invitation: show it here rather than as an alert.
+        .onChange(of: household.pendingInvite != nil, initial: true) { _, invited in
+            if invited, flow.screen != .invite { flow.go(to: .invite) }
+        }
+    }
+
+    @ViewBuilder
+    private var screen: some View {
+        switch flow.screen {
+        case .welcome: OnboardingWelcome()
+        case .invite: OnboardingInvite()
+        case .household: OnboardingHousehold()
+        case .partner: OnboardingPartner()
+        case .connect: OnboardingConnect()
+        case .plan: OnboardingPlan()
+        case .bills: OnboardingBills()
+        case .alerts: OnboardingAlerts()
+        case .ready: OnboardingReady { tour in
+            UserDefaults.standard.set(tour, forKey: SettingsKey.wantsTour)
+            AppRouter.shared.tab = .overview
+            onboarded = true
+        }
+        }
     }
 }
 
-/// The sign-in screen, laid out like Hearken's: the app icon, name and promise, three things
-/// Suffice does, and Sign in with Apple pinned at the bottom with "Not now" under it. Signing in
-/// is optional (App Review guideline 5.1.1); it only fills in your name.
-private struct WelcomeView: View {
-    @Binding var givenName: String
-    var next: () -> Void
+/// Where onboarding is, and what's been decided so far.
+@Observable
+final class OnboardingFlow {
+    enum Screen: Hashable {
+        case welcome, invite, household, partner, connect, plan, bills, alerts, ready
+    }
 
-    @AppStorage(SettingsKey.appleUserID) private var appleUserID = ""
-    @State private var signedIn = false
-    @State private var appleNonce: String?
-    @State private var errorMessage: String?
+    private(set) var screen: Screen = .welcome
+    /// Which way the last move went, for the slide.
+    private(set) var isForward = true
 
-    init(givenName: Binding<String>, next: @escaping () -> Void) {
-        self._givenName = givenName
-        self.next = next
+    // Who's budgeting
+    var myName = ""
+    var partnerName = ""
+    var myPhoto: Data?
+    var partnerPhoto: Data?
+    /// The people saved so far, so going back and renaming updates them instead of adding more.
+    var myID: UUID?
+    var partnerID: UUID?
+
+    // Plan and bills, worked out once from the bank history and kept while going back and forth.
+    var planRows: [PlanRow]?
+    var incomeText = ""
+    var foundBills: [SpendingHistory.FoundBill]?
+    var keptBills: Set<UUID> = []
+
+    var partner: String? {
+        let name = partnerName.trimmingCharacters(in: .whitespaces)
+        return name.isEmpty ? nil : name
+    }
+
+    /// The numbered steps: Invite only when there's a partner to invite.
+    var steps: [Screen] {
+        var steps: [Screen] = [.household]
+        if partner != nil { steps.append(.partner) }
+        steps += [.connect, .plan, .bills, .alerts]
+        return steps
+    }
+
+    func go(to screen: Screen) {
+        move(to: screen, forward: true)
+    }
+
+    /// Sets the direction first and moves on the next turn of the run loop, so the screen
+    /// leaving slides the right way too (its transition is read when it's removed).
+    private func move(to screen: Screen, forward: Bool) {
+        isForward = forward
+        Task { @MainActor in
+            withAnimation(.smooth(duration: 0.35)) { self.screen = screen }
+        }
+    }
+
+    func next() {
+        switch screen {
+        case .welcome, .invite: go(to: .household)
+        case .alerts: go(to: .ready)
+        case .ready: break
+        default:
+            guard let index = steps.firstIndex(of: screen), index + 1 < steps.count else { return go(to: .ready) }
+            go(to: steps[index + 1])
+        }
+    }
+
+    func back() {
+        let previous: Screen
+        if let index = steps.firstIndex(of: screen), index > 0 {
+            previous = steps[index - 1]
+        } else {
+            previous = .welcome
+        }
+        move(to: previous, forward: false)
+    }
+
+    /// "2 of 6", for the step bar.
+    var position: (number: Int, of: Int)? {
+        steps.firstIndex(of: screen).map { (number: $0 + 1, of: steps.count) }
+    }
+}
+
+/// One budget on Plan the month: an existing top-level budget, or a new one onboarding suggests.
+struct PlanRow: Identifiable, Hashable {
+    var id: UUID
+    var name: String
+    var symbol: String
+    var color: CategoryColor
+    /// "Groceries, Fast food · avg $940"
+    var hint: String
+    /// What's typed in its amount field.
+    var amountText: String
+    /// Not a budget yet: Use This Plan adds it.
+    var isNew = false
+}
+
+// MARK: - Look
+
+/// The onboarding designs' colors and type.
+enum OnboardingStyle {
+    /// The readable column on iPad.
+    static let columnWidth: CGFloat = 480
+    /// Buttons.
+    static let green = Color(hex: 0x0E8A34)
+    /// Step bars, links, "This iPhone".
+    static let accent = Color(hex: 0x5BD27A)
+    static let card = Color(hex: 0x1C1C1E)
+    static let secondaryText = Color(hex: 0xAEAEB2)
+    static let tertiaryText = Color(hex: 0x98989F)
+    static let divider = Color.white.opacity(0.08)
+    /// The green wash at the top of Welcome.
+    static let wash = LinearGradient(
+        stops: [
+            .init(color: Color(hex: 0x0B6B2A), location: 0),
+            .init(color: Color(hex: 0x06401A), location: 0.3),
+            .init(color: .black, location: 0.58),
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+    )
+}
+
+/// The pill buttons from the designs: solid green, translucent, white, or plain text.
+struct OnboardingButtonStyle: ButtonStyle {
+    enum Kind { case primary, secondary, white, plain }
+    var kind: Kind = .primary
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: kind == .plain ? 16 : 17, weight: kind == .secondary || kind == .plain ? .semibold : .bold))
+            .foregroundStyle(foreground)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: kind == .plain ? 44 : (kind == .secondary ? 50 : 54))
+            .background {
+                switch kind {
+                case .primary: Capsule().fill(OnboardingStyle.green)
+                case .secondary: Capsule().fill(.white.opacity(0.10)).overlay(Capsule().strokeBorder(.white.opacity(0.14)))
+                case .white: Capsule().fill(.white)
+                case .plain: Color.clear
+                }
+            }
+            .contentShape(Capsule())
+            .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+
+    private var foreground: Color {
+        switch kind {
+        case .white: Brand.greenInk
+        default: .white
+        }
+    }
+}
+
+extension ButtonStyle where Self == OnboardingButtonStyle {
+    static func onboarding(_ kind: OnboardingButtonStyle.Kind = .primary) -> OnboardingButtonStyle {
+        OnboardingButtonStyle(kind: kind)
+    }
+}
+
+/// A numbered step: back button, step bar and "2 of 6" across the top, a big title and a line
+/// under it, the screen's content scrolling, and its buttons pinned to the bottom.
+struct OnboardingStep<Content: View, Controls: View>: View {
+    var title: String
+    var subtitle: String
+    var content: Content
+    var controls: Controls
+    @Environment(OnboardingFlow.self) private var flow
+
+    init(title: String, subtitle: String, @ViewBuilder content: () -> Content, @ViewBuilder controls: () -> Controls) {
+        self.title = title
+        self.subtitle = subtitle
+        self.content = content()
+        self.controls = controls()
     }
 
     var body: some View {
-        OnboardingPage(title: "Suffice", subtitle: "Budget together, and know you have enough.") { isShort in
-            AppIconBadge(size: isShort ? 64 : 92)
-        } content: { isShort in
-            if signedIn {
-                signedInConfirmation
-            } else {
-                VStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        OnboardingFeatureRow(symbol: "chart.pie.fill", title: "One budget for two", detail: "Plan each month together and see what's left at a glance.")
-                        OnboardingFeatureRow(symbol: "calendar.badge.checkmark", title: "Bills on time", detail: "See what's due this week and mark it paid in a tap.")
-                        OnboardingFeatureRow(symbol: "icloud.fill", title: "Private by design", detail: "Your budget lives in your own iCloud, not on our API. No ads or tracking.")
+        VStack(spacing: 0) {
+            header
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(title)
+                            .font(.system(size: 32, weight: .heavy))
+                            .tracking(-0.5)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader)
+                        Text(subtitle)
+                            .font(.system(size: 16))
+                            .foregroundStyle(OnboardingStyle.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    // Short screens: the fine print scrolls with the content so the pinned
-                    // buttons don't cover the features.
-                    if isShort { finePrint }
+                    .padding(.horizontal, 4)
+                    content
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 22)
+                .padding(.bottom, 24)
+                .frame(maxWidth: OnboardingStyle.columnWidth, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
-        } controls: { isShort in
-            if signedIn {
-                OnboardingPrimaryButton(title: "Continue", action: next)
-            } else {
-                VStack(spacing: 6) {
-                    SignInWithAppleButton(.signIn) { request in
-                        request.requestedScopes = [.fullName, .email]
-                        do {
-                            appleNonce = try HearthAPI.prepareAppleRequest(request)
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                    } onCompletion: { result in
-                        switch result {
-                        case .success(let authorization):
-                            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
-                                errorMessage = "Apple did not return a usable credential. Please try again."
-                                return
-                            }
-                            let token = credential.identityToken
-                            let nonce = appleNonce
-                            let userID = credential.user
-                            let fullName = credential.fullName
-                            let email = credential.email
-                            Task { @MainActor in
-                                do {
-                                    try await HearthAPI.shared.signInWithApple(identityToken: token, nonce: nonce, appleUserID: userID, fullName: fullName, email: email)
-                                    appleUserID = userID
-                                    // Apple only sends the name the first time; another Hearth app
-                                    // may have kept it.
-                                    let sharedFirst = HearthAPI.sharedAppleName(for: userID)?
-                                        .split(separator: " ").first.map(String.init)
-                                    if let name = fullName?.givenName ?? sharedFirst, !name.isEmpty { givenName = name }
-                                    withAnimation { signedIn = true }
-                                } catch {
-                                    errorMessage = error.localizedDescription
-                                }
-                            }
-                        case .failure(let error as ASAuthorizationError) where error.code == .canceled:
-                            break // The person closed the sheet; nothing to report.
-                        case .failure(let error):
-                            errorMessage = error.localizedDescription
-                        }
-                    }
-                    .modifier(AdaptiveSignInStyle())
-                    .frame(height: 52)
-                    .clipShape(Capsule())
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
 
-                    Button("Not now", action: next)
-                        .frame(minHeight: 44)
-
-                    if !isShort { finePrint }
-                }
-            }
+            VStack(spacing: 10) { controls }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+                .frame(maxWidth: OnboardingStyle.columnWidth)
         }
-        .alert("Couldn't sign in", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage ?? "")
-        }
+        .foregroundStyle(.white)
+        .background(Color.black.ignoresSafeArea())
     }
 
-    private var signedInConfirmation: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(Brand.green)
-                .symbolEffect(.bounce, value: signedIn)
-            Text(givenName.isEmpty ? "You're signed in" : "Welcome, \(givenName)")
-                .font(.title2.bold())
-            Text("Next, connect the accounts you budget from.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-    }
+    private var header: some View {
+        HStack(spacing: 14) {
+            Button(action: flow.back) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.white.opacity(0.12), in: .circle)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
 
-    private var finePrint: some View {
-        Text("Optional. Signing in enables future bank connections and adds your name. Everything else works and syncs with iCloud without it.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
+            if let position = flow.position {
+                HStack(spacing: 6) {
+                    ForEach(1...position.of, id: \.self) { index in
+                        Capsule()
+                            .fill(index <= position.number ? OnboardingStyle.accent : .white.opacity(0.16))
+                            .frame(height: 5)
+                    }
+                }
+                .animation(.smooth, value: position.number)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Step \(position.number) of \(position.of)")
+
+                Text("\(position.number) of \(position.of)")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(OnboardingStyle.tertiaryText)
+                    .frame(width: 44, alignment: .trailing)
+                    .accessibilityHidden(true)
+            } else {
+                Spacer()
+            }
+        }
+        .frame(maxWidth: OnboardingStyle.columnWidth)
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// A rounded dark card holding rows.
+struct OnboardingCard<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(spacing: 0) { content }
+            .background(OnboardingStyle.card, in: .rect(cornerRadius: 24, style: .continuous))
+            .clipShape(.rect(cornerRadius: 24, style: .continuous))
+    }
+}
+
+/// The hairline between rows in a card, starting after the row's icon.
+struct OnboardingDivider: View {
+    var inset: CGFloat = 64
+
+    var body: some View {
+        Rectangle()
+            .fill(OnboardingStyle.divider)
+            .frame(height: 1)
+            .padding(.leading, inset)
+    }
+}
+
+/// A round badge with a letter or symbol on a category's dark tint, as in the designs' lists.
+struct OnboardingInitial: View {
+    var text: String
+    var color: CategoryColor
+    var size: CGFloat = 38
+
+    var body: some View {
+        Text(text.prefix(1).uppercased())
+            .font(.system(size: size * 0.4, weight: .bold))
+            .foregroundStyle(color.color)
+            .frame(width: size, height: size)
+            .background(color.color.opacity(0.2), in: .circle)
+            .accessibilityHidden(true)
+    }
+}
+
+/// A text link with a plus, like "Add a Budget".
+struct OnboardingAddLink: View {
+    var title: String
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(title, systemImage: "plus.circle.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(OnboardingStyle.accent)
+                .padding(.horizontal, 6)
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -152,191 +367,6 @@ struct AdaptiveSignInStyle: ViewModifier {
 
     func body(content: Content) -> some View {
         content.signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-    }
-}
-
-/// Step 3: who's budgeting. Creates the household members and marks this iPhone's person.
-private struct HouseholdSetupView: View {
-    var givenName: String
-    var finish: () -> Void
-
-    @Environment(\.modelContext) private var context
-    @Query(sort: \Member.sortOrder) private var members: [Member]
-    @AppStorage(SettingsKey.currentMember) private var currentMember = ""
-    @State private var myName = ""
-    @State private var partnerName = ""
-    @State private var myPhoto: Data?
-    @State private var partnerPhoto: Data?
-    /// Set once Start Budgeting runs, so a second tap (or Return) can't add everyone again.
-    @State private var didSave = false
-    /// The parents in Caloma, if it's on this iPhone, for "Use names from Caloma?".
-    @State private var calomaParents: [String] = []
-    @AppStorage(CalomaFamily.dismissedKey) private var calomaDismissed = false
-    @FocusState private var field: Field?
-
-    private enum Field { case mine, partner }
-
-    init(givenName: String, finish: @escaping () -> Void) {
-        self.givenName = givenName
-        self.finish = finish
-    }
-
-    private var canStart: Bool { !myName.trimmingCharacters(in: .whitespaces).isEmpty }
-
-    var body: some View {
-        OnboardingPage(
-            title: "Who's budgeting?",
-            subtitle: "Each of you gets a badge on the transactions you make. Tap a circle to add a photo.",
-            step: (3, 3)
-        ) { isShort in
-            OnboardingSymbolIcon(symbol: "person.2.fill", size: isShort ? 64 : 92)
-        } content: { _ in
-            VStack(spacing: 12) {
-                VStack(spacing: 0) {
-                    nameRow("Your name", text: $myName, photo: $myPhoto, color: .green, which: .mine)
-                    Divider().padding(.leading, 66)
-                    nameRow("Partner's name (optional)", text: $partnerName, photo: $partnerPhoto, color: .purple, which: .partner)
-                }
-                .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 20))
-
-                if let suggestion = calomaSuggestion {
-                    calomaPrompt(suggestion)
-                        .transition(.opacity)
-                }
-            }
-        } controls: { _ in
-            VStack(spacing: 6) {
-                OnboardingPrimaryButton(title: "Start Budgeting", action: save)
-                    .disabled(!canStart)
-                Button("Skip for now", action: finish)
-                    .frame(minHeight: 44)
-            }
-        }
-        .onAppear {
-            if myName.isEmpty { myName = givenName }
-            calomaParents = CalomaFamily.parentNames()
-        }
-    }
-
-    // MARK: Names from Caloma
-
-    /// Your name and your partner's from Caloma's parents, when that would fill something in:
-    /// the partner's name is empty, and yours is empty or already one of Caloma's parents (so
-    /// we know which one is you).
-    private var calomaSuggestion: (mine: String, partner: String?)? {
-        guard !calomaDismissed, !calomaParents.isEmpty,
-              partnerName.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        let typed = myName.trimmingCharacters(in: .whitespaces)
-        let mine: String
-        if typed.isEmpty {
-            mine = calomaParents[0]
-        } else if let match = calomaParents.first(where: { $0.lowercased() == typed.lowercased() }) {
-            mine = match
-        } else {
-            return nil
-        }
-        let partner = calomaParents.first { $0.lowercased() != mine.lowercased() }
-        // Your name is already in and Caloma has no one else: nothing to add.
-        if partner == nil && !typed.isEmpty { return nil }
-        return (mine, partner)
-    }
-
-    /// "Use names from Caloma? Steve and Jen", with Use and Not Now.
-    private func calomaPrompt(_ suggestion: (mine: String, partner: String?)) -> some View {
-        let names = ([suggestion.mine] + (suggestion.partner.map { [$0] } ?? [])).formatted(.list(type: .and))
-        return HStack(spacing: 12) {
-            Image(systemName: "house.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: 32, height: 32)
-                .background(Color(hex: 0xE0284F), in: .rect(cornerRadius: 8))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Use names from Caloma?")
-                    .font(.subheadline.weight(.semibold))
-                Text(names)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 4)
-            Button("Use") {
-                withAnimation {
-                    myName = suggestion.mine
-                    if myPhoto == nil { myPhoto = CalomaFamily.parentPhoto(named: suggestion.mine) }
-                    if let partner = suggestion.partner {
-                        partnerName = partner
-                        if partnerPhoto == nil { partnerPhoto = CalomaFamily.parentPhoto(named: partner) }
-                    }
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Brand.green)
-            .controlSize(.small)
-            Button {
-                withAnimation { calomaDismissed = true }
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Not now")
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 16))
-    }
-
-    /// A name field with the badge it will become: their photo, or their initial in their
-    /// color. Tapping the badge picks a photo.
-    private func nameRow(_ prompt: String, text: Binding<String>, photo: Binding<Data?>, color: MemberColor, which: Field) -> some View {
-        HStack(spacing: 12) {
-            PhotoPickerAvatar(name: text.wrappedValue, color: color, photo: photo, size: 40)
-            TextField(prompt, text: text)
-                .textContentType(which == .mine ? .givenName : nil)
-                .textInputAutocapitalization(.words)
-                .submitLabel(which == .mine ? .next : .done)
-                .focused($field, equals: which)
-                .onSubmit {
-                    if which == .mine {
-                        field = .partner
-                    } else if canStart {
-                        save()
-                    }
-                }
-        }
-        .padding(.horizontal, 14)
-        .frame(minHeight: 60)
-    }
-
-    private func save() {
-        guard canStart, !didSave else { return }
-        didSave = true
-        let mine = person(named: myName, color: .green, photo: myPhoto, order: 0)
-        let partner = partnerName.trimmingCharacters(in: .whitespaces)
-        if !partner.isEmpty {
-            _ = person(named: partner, color: .purple, photo: partnerPhoto, order: 1)
-        }
-        try? context.save()
-        currentMember = mine.id.uuidString
-        finish()
-    }
-
-    /// The household member with this name, updated, or a new one. Someone going through
-    /// onboarding again (after erasing data, say) never ends up listed twice.
-    private func person(named rawName: String, color: MemberColor, photo: Data?, order: Int) -> Member {
-        let name = rawName.trimmingCharacters(in: .whitespaces)
-        if let existing = members.first(where: { $0.name.trimmingCharacters(in: .whitespaces).lowercased() == name.lowercased() }) {
-            if let photo { existing.photoData = photo }
-            return existing
-        }
-        let start = (members.map(\.sortOrder).max() ?? -1) + 1
-        let member = Member(name: name, color: color, photoData: photo, sortOrder: start + order)
-        context.insert(member)
-        return member
     }
 }
 

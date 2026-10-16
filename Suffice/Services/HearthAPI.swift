@@ -565,6 +565,8 @@ nonisolated struct BankTransaction: Decodable, Sendable {
     let amountCents: Int
     let isIncome: Bool
     let category: String?
+    /// Plaid's detailed category ("FOOD_AND_DRINK_GROCERIES"); nil from older API versions.
+    let categoryDetail: String?
     /// Plaid's merchant logo, when it has one.
     let logoUrl: String?
     /// The merchant's website domain ("target.com"), for Logo.dev.

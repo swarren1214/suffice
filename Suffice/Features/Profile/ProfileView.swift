@@ -18,6 +18,14 @@ struct ProfileView: View {
     @State private var cloud = HouseholdSync.shared
 
     private var me: Member? { members.first { $0.id.uuidString == currentMember } }
+    @AppStorage(SettingsKey.remindBills) private var remindBills = false
+    @AppStorage(SettingsKey.remindBudgets) private var remindBudgets = false
+    @AppStorage(SettingsKey.remindWeekly) private var remindWeekly = false
+
+    private var remindersValue: String {
+        let count = [remindBills, remindBudgets, remindWeekly].filter { $0 }.count
+        return count == 0 ? "Off" : "\(count) on"
+    }
 
     var body: some View {
         ScrollView {
@@ -85,6 +93,10 @@ struct ProfileView: View {
                         ProfileRow(symbol: "sparkles", color: Color(hex: 0x5B3FD9), title: "Ask Suffice", value: OnDeviceModel.availability == .available ? "" : OnDeviceModel.availability.statusText)
                     }
                     Divider().padding(.leading, 60)
+                    NavigationLink { RemindersView() } label: {
+                        ProfileRow(symbol: "bell.badge", color: Color(hex: 0xC25E00), title: "Reminders", value: remindersValue)
+                    }
+                    Divider().padding(.leading, 60)
                     NavigationLink { AboutView() } label: {
                         ProfileRow(symbol: "info.circle", color: Brand.green, title: "About Suffice", value: "v\(AppConfig.version)")
                     }
@@ -98,6 +110,23 @@ struct ProfileView: View {
                     }
                     .padding(.horizontal, 16)
                     .frame(minHeight: 54)
+                }
+                .buttonStyle(.plain)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
+
+                NavigationLink { HearthAppsView(current: .suffice) } label: {
+                    HStack(spacing: 12) {
+                        HearthAppsRowLabel(current: .suffice)
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 54)
+                    .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))

@@ -16,6 +16,17 @@ nonisolated enum SettingsKey {
     static let faceIDLock = "privacy.faceIDLock"
     /// The Sign in with Apple user, when they chose to sign in.
     static let appleUserID = "account.appleUserID"
+    /// Reminders (Profile › Reminders): the morning before a bill is due, a budget passing 80%
+    /// or going over, and a Sunday check-in.
+    static let remindBills = "reminders.bills"
+    static let remindBudgets = "reminders.budgets"
+    static let remindWeekly = "reminders.weekly"
+    /// Take-home pay per month, from onboarding's plan (dollars and cents, as cents).
+    static let monthlyIncome = "plan.monthlyIncome"
+    /// Onboarding ended with Show Me Around: the tour runs when the tabs first appear.
+    static let wantsTour = "tour.pending"
+    /// Someone who joined a household was asked which person they are.
+    static let askedWhoAmI = "household.askedWhoAmI"
 }
 
 /// Suffice's brand colors, from the MVP v2 designs. The darker greens carry white text; the

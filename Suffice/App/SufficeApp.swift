@@ -31,11 +31,13 @@ struct SufficeApp: App {
         NotificationCenter.default.addObserver(forName: ModelContext.didSave, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated {
                 WidgetSync.schedule(container)
+                Reminders.schedule(container)
                 // The other Hearth apps get the household's names and photos.
                 HearthHousehold.schedule(container)
             }
         }
         WatchSync.shared.start()
+        Reminders.start()
         WidgetSync.refresh(container.mainContext)
         // One sign-in for every Hearth app: follow sign-ins and sign-outs in BigTable and Sated.
         HearthSignIn.start()
@@ -151,6 +153,14 @@ struct AppRoot: View {
     @Environment(AppLock.self) private var lock
     @AppStorage(SettingsKey.onboarded) private var onboarded = false
     @State private var household = HouseholdSync.shared
+    @Query(sort: \Member.sortOrder) private var members: [Member]
+    @AppStorage(SettingsKey.currentMember) private var currentMember = ""
+    @AppStorage(SettingsKey.askedWhoAmI) private var askedWhoAmI = false
+
+    /// Just joined a household and its people are here: ask which one is you.
+    private var asksWhoAmI: Bool {
+        onboarded && household.isMember && currentMember.isEmpty && !askedWhoAmI && !members.isEmpty
+    }
 
     var body: some View {
         Group {
@@ -165,11 +175,14 @@ struct AppRoot: View {
         // A household invitation: joining replaces the budget on this device.
         .alert(
             "Join \(household.inviterName)’s household?",
-            isPresented: Binding(get: { household.pendingInvite != nil }, set: { if !$0 { household.pendingInvite = nil } })
+            // During onboarding, I Have an Invite shows it instead.
+            isPresented: Binding(get: { onboarded && household.pendingInvite != nil }, set: { if !$0 { household.pendingInvite = nil } })
         ) {
             Button("Not Now", role: .cancel) {}
             Button("Join") {
-                Task { await household.acceptInvite() }
+                // Dismissing the alert clears the pending invitation, so hand it over directly.
+                let invite = household.pendingInvite
+                Task { await household.acceptInvite(invite) }
             }
         } message: {
             Text("You’ll share one budget and both see every change. The budget on this \(DeviceName.current) is replaced by the shared one. Yours stays in your iCloud and comes back if you leave.")
@@ -181,6 +194,9 @@ struct AppRoot: View {
                     .padding(28)
                     .background(.regularMaterial, in: .rect(cornerRadius: 20))
             }
+        }
+        .sheet(isPresented: Binding(get: { asksWhoAmI }, set: { if !$0 { askedWhoAmI = true } })) {
+            WhoAreYouSheet(members: members)
         }
         // Widgets open suffice://overview, suffice://budget or suffice://bills.
         .onOpenURL { url in
@@ -210,6 +226,7 @@ struct AppRoot: View {
                 Task { await household.syncNow() }
                 Task { await HearthSignIn.follow() }
                 HearthHousehold.publish(in: context)
+                Task { await Reminders.refresh(context) }
                 // Connected banks, at most hourly.
                 Task {
                     await BankSync.syncAllIfStale(

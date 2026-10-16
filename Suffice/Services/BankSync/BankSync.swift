@@ -113,7 +113,7 @@ enum BankSync {
     }
 
     /// Bump the version to fetch every transaction again once more on each device.
-    private static let detailsRefreshKey = "bankSync.detailsRefreshed.v1"
+    private static let detailsRefreshKey = "bankSync.detailsRefreshed.v2"
 
     /// On opening the app: sync when it's been more than an hour (or a one-time refresh is due).
     static func syncAllIfStale(memberID: UUID?, in context: ModelContext) async {
@@ -145,6 +145,7 @@ enum BankSync {
             if let entry = existing[transaction.id] { backfill(entry, from: transaction) }
         }
 
+        var arrived: [LedgerEntry] = []
         for transaction in page.added where existing[transaction.id] == nil {
             let entry = LedgerEntry(
                 date: day(transaction.date),
@@ -157,6 +158,7 @@ enum BankSync {
                 isReviewed: false
             )
             entry.externalID = transaction.id
+            entry.bankCategory = transaction.categoryDetail ?? transaction.category
             entry.logoURL = MerchantLogo.url(plaidLogo: transaction.logoUrl, domain: transaction.merchantDomain)?.absoluteString
             entry.placeName = transaction.city
             entry.placeAddress = transaction.address
@@ -164,7 +166,10 @@ enum BankSync {
             entry.longitude = transaction.longitude
             context.insert(entry)
             existing[transaction.id] = entry
+            arrived.append(entry)
         }
+        // Payments for bills mark those bills paid.
+        BillMatcher.link(arrived, in: context)
 
         // Changes from the bank (a tip added, a merchant renamed). People's own edits to the
         // category, person and note stay.
@@ -174,6 +179,7 @@ enum BankSync {
             entry.payee = transaction.payee
             entry.amountCents = transaction.amountCents
             entry.kind = transaction.isIncome ? .income : .expense
+            entry.bankCategory = transaction.categoryDetail ?? transaction.category ?? entry.bankCategory
             entry.logoURL = MerchantLogo.url(plaidLogo: transaction.logoUrl, domain: transaction.merchantDomain)?.absoluteString ?? entry.logoURL
         }
 
@@ -193,6 +199,7 @@ enum BankSync {
         if entry.logoURL == nil {
             entry.logoURL = MerchantLogo.url(plaidLogo: transaction.logoUrl, domain: transaction.merchantDomain)?.absoluteString
         }
+        if entry.bankCategory == nil { entry.bankCategory = transaction.categoryDetail ?? transaction.category }
         if entry.placeName == nil { entry.placeName = transaction.city }
         if entry.placeAddress == nil { entry.placeAddress = transaction.address }
         if entry.latitude == nil, entry.longitude == nil {
