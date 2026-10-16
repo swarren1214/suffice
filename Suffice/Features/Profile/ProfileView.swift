@@ -246,6 +246,10 @@ private struct ProfileSignIn: View {
 /// Profile › iCloud Sync: whether it's working, when it last synced, and what went wrong.
 private struct CloudSyncView: View {
     @State private var cloud = HouseholdSync.shared
+    #if DEBUG
+    @State private var isSeeding = false
+    @State private var seedResult: String?
+    #endif
 
     var body: some View {
         Form {
@@ -270,6 +274,28 @@ private struct CloudSyncView: View {
                         .textSelection(.enabled)
                 }
             }
+            #if DEBUG
+            Section {
+                Button(isSeeding ? "Creating…" : "Create Development Schema", systemImage: "hammer") {
+                    isSeeding = true
+                    Task {
+                        seedResult = await cloud.seedDevelopmentSchema()
+                        isSeeding = false
+                    }
+                }
+                .disabled(isSeeding)
+                if let seedResult {
+                    Text(seedResult)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            } header: {
+                Text("Developer")
+            } footer: {
+                Text("Debug builds only. Saves one of every record type to CloudKit's Development environment so the whole schema can be deployed to Production.")
+            }
+            #endif
         }
         .navigationTitle("iCloud Sync")
         .refreshable { await cloud.syncNow() }

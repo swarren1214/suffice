@@ -158,39 +158,29 @@ struct AskButton: View {
     }
 }
 
-/// The signed-in person's photo (or initial) at the top right. Opens Profile. If the bar runs
-/// out of room and folds it into its "…" menu, it reads "View Profile" with a profile icon.
+/// The signed-in person's photo (or initial) at the top right. Opens Profile.
+///
+/// Drawn as a live view, not an image: the toolbar repaints images in one flat color, which
+/// turned the photo into a plain white circle.
 struct ProfileButton: View {
     @Query(sort: \Member.sortOrder) private var members: [Member]
     @AppStorage(SettingsKey.currentMember) private var currentMember = ""
-    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
+        // Redraw when another Hearth app shares a photo (used when you have none here).
+        let _ = HearthPhotos.shared.generation
         NavigationLink {
             ProfileView()
         } label: {
-            Label {
-                Text("View Profile")
-            } icon: {
-                if let avatar {
-                    avatar.renderingMode(.original)
-                } else {
-                    Image(systemName: "person.crop.circle.fill")
-                        .foregroundStyle(.white)
-                }
+            if let me = members.first(where: { $0.id.uuidString == currentMember }) {
+                PersonAvatar(member: me, size: 30)
+            } else {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.white)
             }
         }
-        .accessibilityLabel("Profile")
-    }
-
-    /// Your avatar drawn into an image, so the menu can show it too (menus only show images).
-    private var avatar: Image? {
-        guard let me = members.first(where: { $0.id.uuidString == currentMember }) else { return nil }
-        // Redraw when another Hearth app shares a photo (used when you have none here).
-        _ = HearthPhotos.shared.generation
-        let renderer = ImageRenderer(content: PersonAvatar(member: me, size: 30))
-        renderer.scale = displayScale
-        return renderer.uiImage.map { Image(uiImage: $0) }
+        .accessibilityLabel("View Profile")
     }
 }
 
@@ -207,7 +197,7 @@ extension View {
                 // is green, which made menu icons green beside white text).
                 AskButton().tint(.white)
                 action().tint(.white)
-                ProfileButton().tint(.white)
+                ProfileButton()
             }
         }
     }

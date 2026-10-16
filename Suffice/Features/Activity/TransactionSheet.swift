@@ -24,6 +24,8 @@ struct TransactionSheet: View {
     @State private var alwaysUse = false
     @State private var confirmsDelete = false
     @State private var pendingDelete = false
+    @State private var receiptRequest: ReceiptRequest?
+    @State private var preparingReceipt = false
     @FocusState private var focus: Field?
 
     private enum Field { case payee, amount, note }
@@ -128,6 +130,8 @@ struct TransactionSheet: View {
                         .focused($focus, equals: .note)
                 }
 
+                ReceiptSection(receipt: $draft.receipt, isPreparing: preparingReceipt) { receiptRequest = $0 }
+
                 if let entry, let latitude = entry.latitude, let longitude = entry.longitude {
                     Section {
                         PlaceMap(coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude), name: entry.placeAddress ?? entry.placeName, color: MerchantColor.color(for: entry.payee))
@@ -156,6 +160,8 @@ struct TransactionSheet: View {
             .navigationTitle(entry == nil ? "New \(draft.kind.name)" : "Transaction")
             .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
+            // Presented from here, outside the rows, so they stay open.
+            .receiptPresenter(receipt: $draft.receipt, request: $receiptRequest, isPreparing: $preparingReceipt)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close", systemImage: "xmark") { dismiss() }

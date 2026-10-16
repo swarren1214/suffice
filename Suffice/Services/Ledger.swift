@@ -20,6 +20,7 @@ enum Ledger {
             billID: draft.billID
         )
         entry.billDueDate = draft.billDueDate
+        entry.receiptData = draft.receipt
         context.insert(entry)
         applyRuleChoice(draft, in: context)
         save(context)
@@ -36,6 +37,7 @@ enum Ledger {
         entry.memberID = draft.memberID
         entry.accountID = draft.accountID
         entry.note = draft.note
+        if entry.receiptData != draft.receipt { entry.receiptData = draft.receipt }
         entry.isReviewed = true
         applyRuleChoice(draft, in: context)
         save(context)
@@ -189,6 +191,8 @@ struct EntryDraft: Equatable {
     var billDueDate: Date?
     /// The "Always use this category" switch: nil leaves any rule alone.
     var alwaysUseCategory: Bool?
+    /// The receipt photo (JPEG).
+    var receipt: Data?
 
     init() {}
 
@@ -201,6 +205,7 @@ struct EntryDraft: Equatable {
         accountID = entry.accountID
         date = entry.date
         note = entry.note
+        receipt = entry.receiptData
         billID = entry.billID
         billDueDate = entry.billDueDate
     }

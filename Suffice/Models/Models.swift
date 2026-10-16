@@ -117,6 +117,9 @@ final class LedgerEntry {
     var externalID: String?
     /// The merchant's logo for bank-synced transactions (Plaid's, or Logo.dev's by domain).
     var logoURL: String?
+    /// A photo of the receipt (a JPEG, scanned or picked in the transaction sheet). Stored
+    /// outside the database file; household sync carries it as an asset.
+    @Attribute(.externalStorage) var receiptData: Data?
     var createdAt: Date = Date.now
 
     init(

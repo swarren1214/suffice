@@ -819,20 +819,43 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
     /// development environment, then deletes it, so the whole schema exists to deploy to
     /// production (which TestFlight and the App Store use) even before there's a bill or a rule.
     private func seedDevelopmentSchemaOnce() async {
-        let key = "household.schemaSeeded.v1"
-        guard !UserDefaults.standard.bool(forKey: key), account == .available else { return }
+        // Bump when a model gains a field, so the new field reaches the development schema.
+        guard !UserDefaults.standard.bool(forKey: Self.schemaSeedKey), account == .available else { return }
+        _ = await seedDevelopmentSchema()
+    }
+
+    private static let schemaSeedKey = "household.schemaSeeded.v2"
+
+    /// Debug builds: saves one of every record type, every field filled, in a throwaway zone of
+    /// the development environment, then deletes it. Returns what happened, for Profile ›
+    /// iCloud Sync › Create Development Schema.
+    func seedDevelopmentSchema() async -> String {
+        await refreshAccount()
+        guard account == .available else { return "iCloud isn't signed in on this device." }
         let zone = CKRecordZone(zoneName: "SchemaSeed")
         let database = container.privateCloudDatabase
         do {
             _ = try await database.modifyRecordZones(saving: [zone], deleting: [])
             let records = SchemaSamples.records(in: zone.zoneID)
             let result = try await database.modifyRecords(saving: records, deleting: [])
-            for (_, saved) in result.saveResults { _ = try saved.get() }
-            _ = try await database.modifyRecordZones(saving: [], deleting: [zone.zoneID])
-            UserDefaults.standard.set(true, forKey: key)
+            var failures: [String] = []
+            for (id, saved) in result.saveResults {
+                if case .failure(let error) = saved {
+                    failures.append("\(id.recordName.split(separator: ".").first ?? ""): \(error.localizedDescription)")
+                }
+            }
+            _ = try? await database.modifyRecordZones(saving: [], deleting: [zone.zoneID])
+            guard failures.isEmpty else {
+                let message = "Some record types failed:\n" + failures.joined(separator: "\n")
+                log.error("\(message, privacy: .public)")
+                return message
+            }
+            UserDefaults.standard.set(true, forKey: Self.schemaSeedKey)
             log.info("Seeded the CloudKit development schema")
+            return "Done: all \(records.count) record types were saved to the Development environment. In the CloudKit Console, open Deploy Schema Changes."
         } catch {
             log.error("Couldn't seed the CloudKit schema: \(error.localizedDescription, privacy: .public)")
+            return "Failed: \(error.localizedDescription)"
         }
     }
     #endif
@@ -865,6 +888,7 @@ private enum SchemaSamples {
         entry.placeAddress = "Sample"
         entry.externalID = "sample"
         entry.logoURL = "https://example.com"
+        entry.receiptData = Data([0xFF, 0xD8, 0xFF, 0xD9])
         let bill = Bill.blank()
         bill.minCents = 1
         bill.maxCents = 2

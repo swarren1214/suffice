@@ -121,10 +121,27 @@ extension CKRecord {
 
 /// Member photos go up as CKAssets, which need a file that lasts until the upload finishes.
 enum SyncAssetFiles {
-    static func url(for id: UUID) -> URL {
+    static func url(for id: UUID, kind: String = "photo") -> URL {
         let folder = URL.cachesDirectory.appending(path: "HouseholdAssets", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appending(path: "\(id.uuidString).jpg")
+        return folder.appending(path: "\(id.uuidString)-\(kind).jpg")
+    }
+
+    /// Writes `data` as the record's asset under `key`, or clears it.
+    static func put(_ data: Data?, on record: CKRecord, key: String, id: UUID) {
+        if let data {
+            let url = url(for: id, kind: key)
+            if (try? data.write(to: url, options: .atomic)) != nil {
+                record[key] = CKAsset(fileURL: url)
+            }
+        } else {
+            record.setObject(nil, forKey: key)
+        }
+    }
+
+    /// The bytes of the record's asset under `key`.
+    static func data(from record: CKRecord, key: String) -> Data? {
+        (record[key] as? CKAsset)?.fileURL.flatMap { try? Data(contentsOf: $0) }
     }
 }
 
@@ -228,6 +245,7 @@ extension LedgerEntry: SyncedModel {
         record.put("externalID", externalID)
         record.put("logoURL", logoURL)
         record.put("createdAt", createdAt)
+        SyncAssetFiles.put(receiptData, on: record, key: "receipt", id: id)
     }
 
     func read(from record: CKRecord) {
@@ -249,6 +267,8 @@ extension LedgerEntry: SyncedModel {
         externalID = record.text("externalID")
         logoURL = record.text("logoURL")
         if let value = record.date("createdAt") { createdAt = value }
+        let receipt = SyncAssetFiles.data(from: record, key: "receipt")
+        if receipt != receiptData { receiptData = receipt }
     }
 }
 

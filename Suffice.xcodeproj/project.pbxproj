@@ -564,6 +564,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Suffice uses Face ID to lock your budget when you turn that on in Profile.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Suffice uses the camera to photograph receipts for your transactions.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Suffice listens when you ask it a question out loud.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Suffice turns what you say into text on this device, so you can ask about your money out loud.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -603,6 +604,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Suffice uses Face ID to lock your budget when you turn that on in Profile.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Suffice uses the camera to photograph receipts for your transactions.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Suffice listens when you ask it a question out loud.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Suffice turns what you say into text on this device, so you can ask about your money out loud.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
