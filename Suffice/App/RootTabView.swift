@@ -45,7 +45,11 @@ struct RootTabView: View {
             Tab(value: AppTab.search, role: .search) {
                 NavigationStack { SearchView() }
             } label: {
-                Label("Search", systemImage: "magnifyingglass")
+                if sizeClass == .regular {
+                    Label { Text("Search") } icon: { Image.menuIcon("magnifyingglass") }
+                } else {
+                    Label("Search", systemImage: "magnifyingglass")
+                }
             }
         }
         // iPad: a tab bar at the top that opens into a sidebar.
@@ -63,7 +67,9 @@ struct RootTabView: View {
     @ViewBuilder
     private func tabIcon(_ title: String, _ systemImage: String) -> some View {
         if sizeClass == .regular {
-            Label(title, systemImage: systemImage)
+            // The sidebar tints tab icons with the app's color; keep each icon the color of its
+            // name instead (black in Light Mode, white in Dark Mode). See AGENT.md.
+            Label { Text(title) } icon: { Image.menuIcon(systemImage) }
         } else {
             Image(systemName: systemImage)
                 .accessibilityLabel(title)

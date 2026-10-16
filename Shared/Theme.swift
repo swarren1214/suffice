@@ -25,6 +25,8 @@ nonisolated enum SettingsKey {
     static let monthlyIncome = "plan.monthlyIncome"
     /// Onboarding ended with Show Me Around: the tour runs when the tabs first appear.
     static let wantsTour = "tour.pending"
+    /// Card colors picked on Overview, by account ID (JSON). On this device only.
+    static let cardStyles = "overview.cardStyles"
     /// Someone who joined a household was asked which person they are.
     static let askedWhoAmI = "household.askedWhoAmI"
 }
