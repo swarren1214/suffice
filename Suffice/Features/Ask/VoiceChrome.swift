@@ -62,7 +62,7 @@ struct VoiceTopBar: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Brand.green)
                 .padding(.horizontal, 14)
-                .frame(height: 36)
+                .frame(minHeight: 36)
                 .glassEffect(.regular, in: .capsule)
                 .accessibilityLabel("Runs on this \(DeviceName.current)")
             Spacer()

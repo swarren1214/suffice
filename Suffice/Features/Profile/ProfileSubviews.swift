@@ -52,12 +52,18 @@ struct HouseholdView: View {
             }
         }
         .navigationTitle("Household")
+        // Pull down to fetch the latest from iCloud, and who's in the household.
+        .refreshable {
+            await household.syncNow()
+            await household.refreshShare()
+        }
         .task { await household.refreshShare() }
         .onAppear { calomaParents = CalomaFamily.parentNames() }
-        .confirmationDialog("Leave the household?", isPresented: $confirmsLeave, titleVisibility: .visible) {
+        .alert("Leave the household?", isPresented: $confirmsLeave) {
             Button("Leave Household", role: .destructive) {
                 Task { await household.leaveHousehold() }
             }
+            Button("Cancel", role: .cancel) {}
         } message: {
             Text("The shared budget is removed from your devices and your own budget comes back. \(household.ownerName ?? "The owner") can invite you again.")
         }
@@ -202,10 +208,10 @@ struct MemberEditor: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", systemImage: "xmark") { dismiss() }
+                    SheetCancelButton { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", systemImage: "checkmark", role: .confirm) { save() }
+                    SheetDoneButton("Save") { save() }
                         .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
@@ -297,7 +303,7 @@ struct AccountsListView: View {
                             Button("Disconnect", role: .destructive) { disconnecting = bank }
                         }
                         .contextMenu {
-                            Button("Disconnect", systemImage: "xmark.circle", role: .destructive) { disconnecting = bank }
+                            Button("Disconnect", menuIcon: "xmark.circle", role: .destructive) { disconnecting = bank }
                         }
                     }
                 } header: {
@@ -330,6 +336,8 @@ struct AccountsListView: View {
             }
         }
         .navigationTitle("Connected accounts")
+        // Pull down to fetch the latest from iCloud.
+        .refreshable { await HouseholdSync.shared.syncNow() }
         .alert("Couldn't sync", isPresented: Binding(get: { problem != nil }, set: { if !$0 { problem = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {

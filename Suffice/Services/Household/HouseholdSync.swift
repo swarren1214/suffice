@@ -45,6 +45,11 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
     private(set) var isSyncing = false
     private(set) var lastSynced: Date?
     private(set) var lastError: String?
+    /// The last problem in words for the iCloud Sync card, or nil when there's nothing to act on
+    /// (offline, signed out: the card shows those itself). Cleared when a sync succeeds.
+    private(set) var syncProblem: String?
+    /// Changes queued on either engine that haven't gone up yet.
+    private(set) var pendingChanges: Int?
     /// Why the last try at joining a household failed, for the invite screen.
     private(set) var joinError: String?
     /// An invitation waiting for the person to say yes (see AppRoot's alert).
@@ -66,12 +71,16 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
     /// queued, so a quit in between can't lose them.
     @ObservationIgnored private var unsavedToken: DefaultHistoryToken?
     @ObservationIgnored private var awaitingFirstUpload = false
+    /// Counts `note(_:)` calls, so Sync Now can tell whether anything failed while it ran.
+    @ObservationIgnored private var problemCount = 0
     @ObservationIgnored private let sharingDelegate = SharingControllerDelegate()
     @ObservationIgnored private let log = Logger(subsystem: "com.stephenwarren.suffice", category: "household-sync")
 
     private static let memberOfKey = "household.memberOf"
     /// Set once this device has queued its first upload.
     private static let startedKey = "household.started"
+    /// When a fetch or upload last finished without an error.
+    private static let lastSyncedKey = "household.lastSynced"
 
     override init() {
         if let owner = UserDefaults.standard.string(forKey: Self.memberOfKey) {
@@ -79,6 +88,7 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
         } else {
             role = .owner
         }
+        lastSynced = UserDefaults.standard.object(forKey: Self.lastSyncedKey) as? Date
         super.init()
     }
 
@@ -110,6 +120,7 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
 
         privateEngine = makeEngine(database: container.privateCloudDatabase, state: Store.loadState(.private))
         sharedEngine = makeEngine(database: container.sharedCloudDatabase, state: Store.loadState(.shared))
+        refreshPendingCount()
 
         if !UserDefaults.standard.bool(forKey: Self.startedKey) {
             // First launch with household sync on this device: the owner uploads what's here.
@@ -149,15 +160,33 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
         return CKSyncEngine(configuration)
     }
 
-    /// Pulls the latest now (opening the app, pull to refresh).
+    /// Pulls the latest now (opening the app, pull to refresh). Every screen's pull to refresh
+    /// calls this: it sends what's waiting, then fetches from iCloud and returns once the
+    /// changes are in the store. Does nothing when sync is off or there's no iCloud account,
+    /// and never throws.
     func syncNow() async {
-        guard let engine = activeEngine else { return }
+        guard let engine = activeEngine, !ScreenshotMode.isOn else { return }
+        switch account {
+        case .noAccount, .restricted, .unavailable: return
+        case .checking, .available: break
+        }
+        // Edits saved in the last moment haven't been queued yet (that waits 400 ms).
+        changeTask?.cancel()
+        sendLocalChanges()
+        let problemsBefore = problemCount
         do {
-            try await engine.fetchChanges()
             try await engine.sendChanges()
         } catch {
             note(error)
         }
+        do {
+            try await engine.fetchChanges()
+        } catch {
+            note(error)
+        }
+        refreshPendingCount()
+        // Both went through and nothing was reported meanwhile: any earlier problem is over.
+        if problemCount == problemsBefore { syncProblem = nil }
     }
 
     func refreshAccount() async {
@@ -341,6 +370,7 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
                     UserDefaults.standard.set(true, forKey: Self.startedKey)
                 }
             }
+            refreshPendingCount()
         case .accountChange(let change):
             // Both engines report it; handle it once.
             if isPrivate { handleAccountChange(change) }
@@ -357,9 +387,12 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
             }
         case .willFetchChanges, .willSendChanges:
             isSyncing = true
-        case .didFetchChanges, .didSendChanges:
+        case .didFetchChanges:
             isSyncing = false
-            lastSynced = .now
+            markSynced()
+        case .didSendChanges:
+            // Counts as synced only from `sentRecordZoneChanges` without failures.
+            isSyncing = false
         default:
             break
         }
@@ -511,7 +544,12 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
             log.error("Couldn't delete \(recordID.recordName, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
         if !retry.isEmpty { engine.state.add(pendingRecordZoneChanges: retry) }
-        if sent.failedRecordSaves.isEmpty { lastError = nil }
+        if sent.failedRecordSaves.isEmpty {
+            lastError = nil
+            syncProblem = nil
+            markSynced()
+        }
+        refreshPendingCount()
         scheduleFieldsSave()
     }
 
@@ -753,6 +791,11 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
         sharedEngine = makeEngine(database: container.sharedCloudDatabase, state: nil)
         historyToken = latestHistoryToken()
         Store.saveToken(historyToken)
+        // A different account (or none) hasn't synced yet.
+        lastSynced = nil
+        UserDefaults.standard.removeObject(forKey: Self.lastSyncedKey)
+        syncProblem = nil
+        refreshPendingCount()
     }
 
     private func cache(_ record: CKRecord) {
@@ -792,6 +835,10 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
 
     private func note(_ error: Error) {
         lastError = Self.describe(error)
+        problemCount += 1
+        if let problem = Self.cardMessage(for: error) {
+            syncProblem = problem
+        }
         log.error("Household sync: \(error.localizedDescription, privacy: .public)")
     }
 
@@ -808,6 +855,34 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
         return error.localizedDescription
     }
 
+    /// The iCloud Sync card's words for an error, or nil when the card already explains it
+    /// (offline, signed out of iCloud).
+    private static func cardMessage(for error: Error) -> String? {
+        if let error = error as? CKError {
+            switch error.code {
+            case .quotaExceeded:
+                return "iCloud storage is full, so new changes can’t be saved there. Free up space in Settings › [your name] › iCloud."
+            case .networkUnavailable, .networkFailure, .notAuthenticated, .operationCancelled:
+                return nil
+            default:
+                break
+            }
+        }
+        return "iCloud couldn’t sync right now. Suffice will try again on its own."
+    }
+
+    private func markSynced() {
+        let now = Date.now
+        lastSynced = now
+        UserDefaults.standard.set(now, forKey: Self.lastSyncedKey)
+    }
+
+    private func refreshPendingCount() {
+        let engines = [privateEngine, sharedEngine].compactMap { $0 }
+        let count: Int? = engines.isEmpty ? nil : engines.reduce(0) { $0 + $1.state.pendingRecordZoneChanges.count }
+        if count != pendingChanges { pendingChanges = count }
+    }
+
     // MARK: Profile
 
     /// One line for Profile › iCloud Sync.
@@ -822,6 +897,25 @@ final class HouseholdSync: NSObject, CKSyncEngineDelegate {
             if isSyncing { return "Syncing…" }
             return lastSynced == nil ? "On" : "Up to date"
         }
+    }
+
+    /// What the iCloud Sync card shows (Profile, and Profile › iCloud Sync).
+    var syncSnapshot: HearthSyncSnapshot {
+        guard AppConfig.cloudSyncEnabled else { return HearthSyncSnapshot(account: .unavailable(nil)) }
+        let state: HearthSyncSnapshot.Account = switch account {
+        case .checking: .checking
+        case .available: .available
+        case .noAccount: .unavailable("Sign in to iCloud in Settings to keep Suffice on all your devices and share it with your partner.")
+        case .restricted: .unavailable("iCloud is restricted on this \(DeviceName.current).")
+        case .unavailable: .unavailable(nil)
+        }
+        return HearthSyncSnapshot(
+            account: state,
+            isSyncing: isSyncing,
+            lastSynced: lastSynced,
+            pendingChanges: pendingChanges,
+            errorMessage: syncProblem
+        )
     }
 
     // MARK: Development schema

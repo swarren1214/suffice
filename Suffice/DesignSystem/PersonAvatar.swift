@@ -60,11 +60,11 @@ struct PhotoPickerAvatar: View {
 
     var body: some View {
         Menu {
-            Button(photo == nil ? "Choose Photo" : "Change Photo", systemImage: "photo.on.rectangle") {
+            Button(photo == nil ? "Choose Photo" : "Change Photo", menuIcon: "photo.on.rectangle") {
                 showsPicker = true
             }
             if photo != nil {
-                Button("Remove Photo", systemImage: "trash", role: .destructive) {
+                Button("Remove Photo", menuIcon: "trash", role: .destructive) {
                     withAnimation { photo = nil }
                 }
             }

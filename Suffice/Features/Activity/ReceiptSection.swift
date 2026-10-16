@@ -135,11 +135,11 @@ struct ReceiptSection: View {
                 Spacer()
                 Menu {
                     if ReceiptCamera.isAvailable {
-                        Button("Scan a New One", systemImage: "camera.viewfinder") { request(.camera) }
+                        Button("Scan a New One", menuIcon: "camera.viewfinder") { request(.camera) }
                     }
-                    Button("Upload a New One", systemImage: "square.and.arrow.up") { request(.library) }
+                    Button("Upload a New One", menuIcon: "square.and.arrow.up") { request(.library) }
                     Divider()
-                    Button("Remove Receipt", systemImage: "trash", role: .destructive) {
+                    Button("Remove Receipt", menuIcon: "trash", role: .destructive) {
                         withAnimation(.snappy) { receipt = nil }
                     }
                 } label: {

@@ -77,6 +77,8 @@ private struct MonthBudget: View {
                 }
             }
         }
+        // Pull down to fetch the latest from iCloud.
+        .refreshable { await HouseholdSync.shared.syncNow() }
         .sheet(item: $opened) { category in
             BudgetSheet(category: category, month: month)
         }

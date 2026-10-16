@@ -104,6 +104,8 @@ private struct MonthBills: View {
                 }
             }
         }
+        // Pull down to fetch the latest from iCloud.
+        .refreshable { await HouseholdSync.shared.syncNow() }
         .sheet(item: $editing) { bill in
             BillEditor(bill: bill)
         }
@@ -122,11 +124,11 @@ private struct MonthBills: View {
             .tint(.primary)
             .contextMenu {
                 if !due.state.isPaid {
-                    Button("Pay a Different Amount…", systemImage: "dollarsign.circle") {
+                    Button("Pay a Different Amount…", menuIcon: "dollarsign.circle") {
                         differentAmount = DraftItem(draft: Ledger.paymentDraft(for: due.bill, dueOn: due.date, memberID: currentMemberID))
                     }
                 }
-                Button("Edit Bill", systemImage: "pencil") { editing = due.bill }
+                Button("Edit Bill", menuIcon: "pencil") { editing = due.bill }
             }
         }
     }
@@ -249,7 +251,7 @@ private struct BillRow: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(state.isPaid ? Color.white : Color.primary)
                     .padding(.horizontal, 14)
-                    .frame(height: 34)
+                    .frame(minHeight: 34)
                     .background(state.isPaid ? Brand.green : Color(.systemGray5), in: .capsule)
             }
             .buttonStyle(.plain)

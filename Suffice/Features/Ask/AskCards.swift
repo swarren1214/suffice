@@ -87,7 +87,7 @@ private struct BudgetAnswerCard: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Brand.green)
                     .padding(.horizontal, 16)
-                    .frame(height: 40)
+                    .frame(minHeight: 40)
                     .background(cardFill, in: .capsule)
             }
             .buttonStyle(.plain)
@@ -181,7 +181,7 @@ private struct TransferCard: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Brand.green)
                             .padding(.horizontal, 16)
-                            .frame(height: 40)
+                            .frame(minHeight: 40)
                             .background(cardFill, in: .capsule)
                     }
                     .buttonStyle(.plain)

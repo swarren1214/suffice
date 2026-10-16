@@ -36,6 +36,8 @@ struct SearchView: View {
             }
         }
         .searchable(text: $query, prompt: "Merchants, budgets, notes")
+        // Pull down to fetch the latest from iCloud.
+        .refreshable { await HouseholdSync.shared.syncNow() }
         .sheet(item: $editing) { entry in
             TransactionSheet(entry: entry)
         }

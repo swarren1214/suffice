@@ -164,18 +164,19 @@ struct TransactionSheet: View {
             .receiptPresenter(receipt: $draft.receipt, request: $receiptRequest, isPreparing: $preparingReceipt)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", systemImage: "xmark") { dismiss() }
+                    SheetCancelButton("Close") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", systemImage: "checkmark", role: .confirm) { save() }
+                    SheetDoneButton { save() }
                         .disabled(!draft.isValid)
                 }
             }
-            .confirmationDialog("Delete this transaction?", isPresented: $confirmsDelete, titleVisibility: .visible) {
+            .alert("Delete this transaction?", isPresented: $confirmsDelete) {
                 Button("Delete Transaction", role: .destructive) {
                     pendingDelete = true
                     dismiss()
                 }
+                Button("Cancel", role: .cancel) {}
             }
             .onAppear(perform: load)
             .task { await locate() }
@@ -332,7 +333,7 @@ private struct PlaceMap: View {
                 Text(name)
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 10)
-                    .frame(height: 28)
+                    .frame(minHeight: 28)
                     .glassEffect(.regular, in: .capsule)
                     .padding(10)
             }

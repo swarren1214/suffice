@@ -151,7 +151,7 @@ struct AskView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Brand.green)
                     .padding(.horizontal, 12)
-                    .frame(height: 30)
+                    .frame(minHeight: 30)
                     .background(Brand.green.opacity(0.1), in: .capsule)
                 Text("Ask anything about your household’s money.")
                     .font(.title2.bold())

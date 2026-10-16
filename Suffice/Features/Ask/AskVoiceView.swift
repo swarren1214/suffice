@@ -186,7 +186,7 @@ struct AskVoiceView: View {
                     Label("Resume", systemImage: "mic.fill")
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 14)
-                        .frame(height: 36)
+                        .frame(minHeight: 36)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Brand.green)

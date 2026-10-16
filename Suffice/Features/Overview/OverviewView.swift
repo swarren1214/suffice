@@ -49,8 +49,9 @@ struct OverviewView: View {
             }
         }
         .tabToolbar { EmptyView() }
-        // Pull down to bring connected banks up to date.
+        // Pull down to fetch the latest from iCloud and bring connected banks up to date.
         .refreshable {
+            await HouseholdSync.shared.syncNow()
             await BankSync.syncAll(memberID: UUID(uuidString: currentMember), in: context)
         }
         .sheet(isPresented: $showsConnect) {

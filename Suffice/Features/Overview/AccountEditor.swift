@@ -18,6 +18,8 @@ struct AccountEditor: View {
     @State private var balanceText = ""
     @State private var includeInBudget = true
     @State private var colorHex = 0x0E3E8C
+    /// The Hearth color picker is open.
+    @State private var pickingColor = false
     @State private var confirmsDelete = false
     @State private var pendingDelete = false
     /// The balance shown when the editor opened, to tell whether it was changed.
@@ -26,8 +28,6 @@ struct AccountEditor: View {
     @State private var balanceEdited = false
     @State private var balanceAtFocus = ""
     @FocusState private var balanceFocused: Bool
-
-    static let colors: [Int] = [0x0E3E8C, 0xC8102E, 0x00843D, 0x5B3FD9, 0xC25E00, 0x1C1C1E]
 
     init(account: Account?, onSave: (() -> Void)? = nil) {
         self.account = account
@@ -53,32 +53,15 @@ struct AccountEditor: View {
                                 .textInputAutocapitalization(.words)
                         }
                     }
-                    HStack(spacing: 10) {
-                        ForEach(Self.colors, id: \.self) { hex in
-                            Button { colorHex = hex } label: {
-                                Circle()
-                                    .fill(Color(hex: UInt32(hex)))
-                                    .frame(width: 30, height: 30)
-                                    .padding(3)
-                                    .overlay(Circle().strokeBorder(hex == colorHex ? Color(hex: UInt32(hex)) : .clear, lineWidth: 2))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Color \(Self.colors.firstIndex(of: hex).map { $0 + 1 } ?? 1)")
-                            .accessibilityAddTraits(hex == colorHex ? .isSelected : [])
-                        }
-                        // Any other color: the system picker, starting from the current one.
-                        ColorPicker("Custom color", selection: customColor, supportsOpacity: false)
-                            .labelsHidden()
-                            .frame(width: 36, height: 36)
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(isCustomColor ? Color(hex: UInt32(colorHex)) : .clear, lineWidth: 2)
-                                    .frame(width: 42, height: 42)
-                                    .allowsHitTesting(false)
-                            )
-                            .accessibilityLabel("Custom color")
-                            .accessibilityAddTraits(isCustomColor ? .isSelected : [])
+                    Button { pickingColor = true } label: {
+                        HearthColorSwatchLabel(color: $colorHex.hearthAccountColor.wrappedValue)
                     }
+                    .hearthColorPicker(
+                        isPresented: $pickingColor,
+                        title: accountTitle,
+                        caption: "Account",
+                        color: $colorHex.hearthAccountColor
+                    )
                 }
 
                 Section {
@@ -139,18 +122,19 @@ struct AccountEditor: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", systemImage: "xmark") { dismiss() }
+                    SheetCancelButton { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", systemImage: "checkmark", role: .confirm) { save() }
+                    SheetDoneButton("Save") { save() }
                         .disabled(!isValid)
                 }
             }
-            .confirmationDialog("Remove this account?", isPresented: $confirmsDelete, titleVisibility: .visible) {
+            .alert("Remove this account?", isPresented: $confirmsDelete) {
                 Button("Remove Account", role: .destructive) {
                     pendingDelete = true
                     dismiss()
                 }
+                Button("Cancel", role: .cancel) {}
             } message: {
                 if account?.source == .plaid {
                     Text("Its transactions stay in Activity. It comes back the next time its bank syncs; to stop that, disconnect the bank in Connected accounts, or turn off Include in budget instead.")
@@ -187,15 +171,12 @@ struct AccountEditor: View {
         return Money.cents(from: balanceText) ?? 0
     }
 
-    private var isCustomColor: Bool { !Self.colors.contains(colorHex) }
-
-    private var customColor: Binding<Color> {
-        Binding(
-            get: { Color(hex: UInt32(truncatingIfNeeded: colorHex)) },
-            set: { newValue in
-                if let hex = newValue.hexValue { colorHex = Int(hex) }
-            }
-        )
+    /// The account's name for the color picker: "Chase Checking", or what's typed so far.
+    private var accountTitle: String {
+        let bank = institution.trimmingCharacters(in: .whitespaces)
+        let accountName = name.trimmingCharacters(in: .whitespaces)
+        let title = [bank, accountName].filter { !$0.isEmpty }.joined(separator: " ")
+        return title.isEmpty ? "New account" : title
     }
 
     private func save() {

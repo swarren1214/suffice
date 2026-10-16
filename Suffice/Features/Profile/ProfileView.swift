@@ -73,22 +73,14 @@ struct ProfileView: View {
                         ProfileRow(symbol: "building.columns", color: Color(hex: 0x2563C9), title: "Connected accounts", value: "\(accounts.count)")
                     }
                     Divider().padding(.leading, 60)
+                    #if DEBUG
+                    // The iCloud Sync card below shows sync status; this page is only the
+                    // CloudKit developer tools.
                     NavigationLink { CloudSyncView() } label: {
-                        ProfileRow(symbol: "icloud", color: Color(hex: 0x1C8CF0), title: "iCloud Sync", value: cloud.summary)
+                        ProfileRow(symbol: "hammer", color: Color(hex: 0x1C8CF0), title: "CloudKit (Debug)", value: "")
                     }
                     Divider().padding(.leading, 60)
-                    if !appleUserID.isEmpty {
-                        HStack(spacing: 12) {
-                            ProfileIcon(symbol: "apple.logo", color: .black)
-                            Text("Apple Account")
-                            Spacer()
-                            Text("Signed in").foregroundStyle(Brand.secondaryText)
-                        }
-                        .padding(.horizontal, 16)
-                        .frame(minHeight: 54)
-                        .accessibilityElement(children: .combine)
-                        Divider().padding(.leading, 60)
-                    }
+                    #endif
                     NavigationLink { AskSettingsView() } label: {
                         ProfileRow(symbol: "sparkles", color: Color(hex: 0x5B3FD9), title: "Ask Suffice", value: OnDeviceModel.availability == .available ? "" : OnDeviceModel.availability.statusText)
                     }
@@ -114,6 +106,10 @@ struct ProfileView: View {
                 .buttonStyle(.plain)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
 
+                ProfileAccount(me: me)
+
+                SufficeSyncCard()
+
                 NavigationLink { HearthAppsView(current: .suffice) } label: {
                     HStack(spacing: 12) {
                         HearthAppsRowLabel(current: .suffice)
@@ -130,10 +126,6 @@ struct ProfileView: View {
                 }
                 .buttonStyle(.plain)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-
-                if appleUserID.isEmpty {
-                    ProfileSignIn()
-                }
 
                 Button(role: .destructive) { confirmsErase = true } label: {
                     Label(cloud.isMember ? "Leave Household" : "Erase App Data", systemImage: cloud.isMember ? "rectangle.portrait.and.arrow.right" : "trash")
@@ -152,6 +144,8 @@ struct ProfileView: View {
         .background(alignment: .top) { HeaderGradient() }
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Profile")
+        // Pull down to fetch the latest from iCloud.
+        .refreshable { await cloud.syncNow() }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
@@ -200,16 +194,51 @@ struct ProfileView: View {
         }
     }
 
+    /// Where the budget lives. Who's signed in is in the account section below.
     private var statusLine: String {
-        let signIn = appleUserID.isEmpty ? "Not signed in" : "Signed in with Apple"
-        let sync = AppConfig.cloudSyncEnabled ? "iCloud sync on" : "Saved on this \(DeviceName.current)"
-        return "\(signIn) · \(sync)"
+        AppConfig.cloudSyncEnabled ? "iCloud sync on" : "Saved on this \(DeviceName.current)"
     }
 }
 
-/// Sign in with Apple for someone who chose "Not now" during onboarding. Connecting a bank
-/// needs it; everything else works without it.
-private struct ProfileSignIn: View {
+/// Profile › Account: the shared Hearth account section (HearthAccount.swift). Signed out, it
+/// offers Sign in with Apple (connecting a bank needs it; everything else works without it);
+/// signed in, it shows who and Sign Out, which signs out of every Hearth app on this device.
+private struct ProfileAccount: View {
+    let me: Member?
+    @AppStorage(SettingsKey.appleUserID) private var appleUserID = ""
+    @State private var confirmsSignOut = false
+
+    private var profile: HearthAccountProfile? {
+        guard !appleUserID.isEmpty else { return nil }
+        return HearthAccountProfile(name: me?.name, email: HearthAccounts.session()?.email, photo: me?.photoData)
+    }
+
+    var body: some View {
+        HearthAccountSection(
+            app: .suffice,
+            profile: profile,
+            pitch: "Sign in to connect your bank accounts and use one account across Suffice, BigTable and Sated. Everything else works without it."
+        ) {
+            ProfileAppleButton()
+        } onSignOut: {
+            confirmsSignOut = true
+        }
+        .alert("Sign out of Suffice?", isPresented: $confirmsSignOut) {
+            Button("Sign Out", role: .destructive) {
+                Task {
+                    await HearthAPI.shared.signOut()
+                    withAnimation { appleUserID = "" }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your bank accounts stop updating until you sign in again, and you’re also signed out of your other Hearth apps on this \(DeviceName.current). Your budget stays on this \(DeviceName.current)\(AppConfig.cloudSyncEnabled ? " and in iCloud" : "").")
+        }
+    }
+}
+
+/// Sign in with Apple for someone who chose "Not now" during onboarding.
+private struct ProfileAppleButton: View {
     @Environment(\.modelContext) private var context
     @AppStorage(SettingsKey.appleUserID) private var appleUserID = ""
     @AppStorage(SettingsKey.currentMember) private var currentMember = ""
@@ -217,53 +246,42 @@ private struct ProfileSignIn: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(spacing: 8) {
-            SignInWithAppleButton(.signIn) { request in
-                request.requestedScopes = [.fullName]
-                do {
-                    nonce = try HearthAPI.prepareAppleRequest(request)
-                } catch {
-                    errorMessage = error.localizedDescription
-                }
-            } onCompletion: { result in
-                switch result {
-                case .success(let authorization):
-                    guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
-                        errorMessage = "Apple did not return a usable credential. Please try again."
-                        return
-                    }
-                    let token = credential.identityToken
-                    let requestNonce = nonce
-                    let userID = credential.user
-                    let fullName = credential.fullName
-                    let email = credential.email
-                    Task { @MainActor in
-                        do {
-                            try await HearthAPI.shared.signInWithApple(identityToken: token, nonce: requestNonce, appleUserID: userID, fullName: fullName, email: email)
-                            withAnimation { appleUserID = userID }
-                            // Banks you connected on another device start syncing here too.
-                            await BankSync.syncAll(memberID: UUID(uuidString: currentMember), in: context)
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                    }
-                case .failure(let error as ASAuthorizationError) where error.code == .canceled:
-                    break
-                case .failure(let error):
-                    errorMessage = error.localizedDescription
-                }
+        SignInWithAppleButton(.signIn) { request in
+            request.requestedScopes = [.fullName]
+            do {
+                nonce = try HearthAPI.prepareAppleRequest(request)
+            } catch {
+                errorMessage = error.localizedDescription
             }
-            .modifier(AdaptiveSignInStyle())
-            .frame(height: 50)
-            .clipShape(Capsule())
-
-            Text("Sign in to connect your bank accounts. Everything else works without it.")
-                .font(.footnote)
-                .foregroundStyle(Brand.secondaryText)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 8)
+        } onCompletion: { result in
+            switch result {
+            case .success(let authorization):
+                guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential else {
+                    errorMessage = "Apple did not return a usable credential. Please try again."
+                    return
+                }
+                let token = credential.identityToken
+                let requestNonce = nonce
+                let userID = credential.user
+                let fullName = credential.fullName
+                let email = credential.email
+                Task { @MainActor in
+                    do {
+                        try await HearthAPI.shared.signInWithApple(identityToken: token, nonce: requestNonce, appleUserID: userID, fullName: fullName, email: email)
+                        withAnimation { appleUserID = userID }
+                        // Banks you connected on another device start syncing here too.
+                        await BankSync.syncAll(memberID: UUID(uuidString: currentMember), in: context)
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+            case .failure(let error as ASAuthorizationError) where error.code == .canceled:
+                break
+            case .failure(let error):
+                errorMessage = error.localizedDescription
+            }
         }
-        .padding(.top, 4)
+        .modifier(AdaptiveSignInStyle())
         .alert("Couldn't sign in", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -272,13 +290,13 @@ private struct ProfileSignIn: View {
     }
 }
 
-/// Profile › iCloud Sync: whether it's working, when it last synced, and what went wrong.
+#if DEBUG
+/// Profile › CloudKit (Debug): iCloud diagnostics and the development schema tool. Everyone
+/// else sees sync status on the iCloud Sync card on Profile.
 private struct CloudSyncView: View {
     @State private var cloud = HouseholdSync.shared
-    #if DEBUG
     @State private var isSeeding = false
     @State private var seedResult: String?
-    #endif
 
     var body: some View {
         Form {
@@ -303,7 +321,6 @@ private struct CloudSyncView: View {
                         .textSelection(.enabled)
                 }
             }
-            #if DEBUG
             Section {
                 Button(isSeeding ? "Creating…" : "Create Development Schema", systemImage: "hammer") {
                     isSeeding = true
@@ -324,9 +341,8 @@ private struct CloudSyncView: View {
             } footer: {
                 Text("Debug builds only. Saves one of every record type to CloudKit's Development environment so the whole schema can be deployed to Production.")
             }
-            #endif
         }
-        .navigationTitle("iCloud Sync")
+        .navigationTitle("CloudKit (Debug)")
         .refreshable { await cloud.syncNow() }
         .task { await cloud.refreshAccount() }
     }
@@ -338,6 +354,43 @@ private struct CloudSyncView: View {
         case .noAccount: "Not signed in"
         case .restricted: "Restricted"
         case .unavailable: "Unavailable"
+        }
+    }
+}
+#endif
+
+/// The shared iCloud Sync card, filled in from household sync, on Profile.
+private struct SufficeSyncCard: View {
+    @Query(sort: \Member.sortOrder) private var members: [Member]
+    @State private var cloud = HouseholdSync.shared
+
+    var body: some View {
+        HearthSyncCard(app: .suffice, snapshot: cloud.syncSnapshot, summary: "Your budget", sharing: sharing) {
+            await HouseholdSync.shared.syncNow()
+        }
+    }
+
+    /// Who the budget is shared with: once someone has been invited, or when this is someone
+    /// else's household.
+    private var sharing: HearthSyncSharing? {
+        guard cloud.isMember || (cloud.isSharing && !cloud.participants.isEmpty) else { return nil }
+        return HearthSyncSharing(
+            label: members.count > 2 ? "Your household" : "Your partner",
+            people: members.map { HearthSyncSharing.Person(id: $0.id.uuidString, initial: $0.initial, colorHex: $0.color.inkHex) }
+        )
+    }
+}
+
+private extension MemberColor {
+    /// `ink` as 0xRRGGBB, for the iCloud Sync card's initials.
+    var inkHex: UInt32 {
+        switch self {
+        case .green: 0x035F1C
+        case .purple: 0x5B3FB0
+        case .blue: 0x1F5FA8
+        case .orange: 0xA34A12
+        case .pink: 0xA3245A
+        case .teal: 0x0F6E69
         }
     }
 }

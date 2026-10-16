@@ -46,6 +46,8 @@ struct BudgetSheet: View {
     @State private var isEditing = false
     /// Which transaction groups are open (the budget's own, and each subcategory's).
     @State private var expandedGroups: Set<UUID> = []
+    /// The Icon & Color picker is open.
+    @State private var pickingLook = false
 
     enum Recurrence: String, CaseIterable, Identifiable {
         case monthly, once
@@ -78,11 +80,6 @@ struct BudgetSheet: View {
     /// Budgets this one could sit inside (never itself).
     private var parents: [BudgetCategory] {
         categories.filter { $0.parentID == nil && $0.id != category?.id && !$0.isArchived }
-    }
-
-    /// The quick icons, with the chosen one up front when it came from the library.
-    private var quickIcons: [String] {
-        SymbolChoices.quick.contains(symbol) ? SymbolChoices.quick : [symbol] + SymbolChoices.quick.prefix(11)
     }
 
     private var isValid: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -122,6 +119,8 @@ struct BudgetSheet: View {
                 .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.interactively)
+            // Pull down to fetch the latest from iCloud.
+            .refreshable { await HouseholdSync.shared.syncNow() }
             .background(Color(.systemGroupedBackground))
             .navigationTitle(category == nil ? (newParentID == nil ? "New budget" : "New subcategory") : (isEditing ? (isSubcategory ? "Edit Subcategory" : "Edit Budget") : ""))
             .navigationBarTitleDisplayMode(.inline)
@@ -132,7 +131,7 @@ struct BudgetSheet: View {
                             withAnimation(.snappy) { isEditing = false }
                         }
                     } else {
-                        Button("Close", systemImage: "xmark") { dismiss() }
+                        SheetCancelButton("Close") { dismiss() }
                     }
                 }
                 if !isEditing && category != nil {
@@ -144,15 +143,16 @@ struct BudgetSheet: View {
                     ToolbarSpacer(.fixed, placement: .primaryAction)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(category == nil ? "Create budget" : "Done", systemImage: "checkmark", role: .confirm) { save() }
+                    SheetDoneButton(category == nil ? "Create budget" : "Done") { save() }
                         .disabled(!isValid)
                 }
             }
-            .confirmationDialog("Delete \(name)?", isPresented: $confirmsDelete, titleVisibility: .visible) {
+            .alert("Delete \(name)?", isPresented: $confirmsDelete) {
                 Button(isSubcategory ? "Delete Subcategory" : "Delete Budget", role: .destructive) {
                     pendingDelete = true
                     dismiss()
                 }
+                Button("Cancel", role: .cancel) {}
             } message: {
                 Text(isSubcategory
                      ? "Its transactions move to \(parent?.name ?? "its budget")."
@@ -183,7 +183,13 @@ struct BudgetSheet: View {
     @ViewBuilder
     private var editingView: some View {
         if isSubcategory {
-            group("Amount") { amountRow }
+            group("Subcategory") {
+                VStack(spacing: 0) {
+                    amountRow
+                    Divider().padding(.leading, 16)
+                    iconColorRow
+                }
+            }
         } else {
             group("Budget") {
                 VStack(spacing: 0) {
@@ -209,36 +215,10 @@ struct BudgetSheet: View {
                         .padding(.horizontal, 16)
                         .frame(minHeight: 52)
                     }
+                    Divider().padding(.leading, 16)
+                    iconColorRow
                 }
             }
-
-            group("Color") {
-                ColorChoiceGrid(selection: $color)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-            }
-        }
-
-        group("Icon") {
-            VStack(spacing: 8) {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 8) {
-                    ForEach(quickIcons, id: \.self) { option in
-                        IconChoiceButton(name: option, isSelected: option == symbol, color: color) {
-                            withAnimation(.snappy) { symbol = option }
-                        }
-                        .accessibilityLabel(option.replacingOccurrences(of: ".", with: " "))
-                    }
-                }
-                NavigationLink {
-                    IconLibraryView(selection: $symbol, color: color)
-                } label: {
-                    Label("More Icons", systemImage: "magnifyingglass")
-                }
-                .tint(Brand.green)
-                .font(.subheadline.weight(.semibold))
-                .frame(minHeight: 36)
-            }
-            .padding(12)
         }
 
         if !isSubcategory {
@@ -429,6 +409,25 @@ struct BudgetSheet: View {
         return line
     }
 
+    /// Icon & Color: opens the shared Hearth picker. A subcategory's color is its budget's, so
+    /// changing it there changes the budget's (and every subcategory's) color.
+    private var iconColorRow: some View {
+        Button { pickingLook = true } label: {
+            HearthIconColorLabel(icon: symbol, color: color.hearthChoice)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 54)
+        .hearthIconColorPicker(
+            isPresented: $pickingLook,
+            title: name.trimmingCharacters(in: .whitespaces).isEmpty ? (isSubcategory ? "New subcategory" : "New budget") : name,
+            caption: isSubcategory ? "Subcategory of \(parent?.name ?? "a budget")" : "Budget",
+            context: .budget,
+            icon: $symbol,
+            color: $color.hearthChoice
+        )
+    }
+
     private var amountRow: some View {
         HStack {
             Text(isSubcategory ? "Each month" : "Monthly amount")
@@ -516,7 +515,7 @@ struct BudgetSheet: View {
                             SubcategoryEditorRow(
                                 draft: $draft,
                                 status: status?.children.first(where: { $0.id == draft.id }),
-                                color: color,
+                                color: $color,
                                 share: budgetCents > 0 ? Double(Money.cents(from: draft.amountText) ?? 0) / Double(budgetCents) : nil,
                                 budgetName: budgetName,
                                 isOver: isOver,
@@ -745,9 +744,14 @@ struct BudgetSheet: View {
         target.symbol = symbol
 
         if let parent {
-            // A subcategory: its own name, amount and icon; the rest is its budget's.
+            // A subcategory: its own name, amount and icon; the rest is its budget's. A color
+            // picked here is the budget's new color, shared with all its subcategories.
             target.parentID = parent.id
             target.limitCents = Money.cents(from: amountText) ?? 0
+            if color != parent.color {
+                parent.color = color
+                for sibling in categories where sibling.parentID == parent.id { sibling.color = color }
+            }
             target.color = parent.color
             target.repeatsMonthly = parent.repeatsMonthly
             target.startMonth = parent.startMonth
@@ -834,11 +838,12 @@ struct SubcategoryDraft: Identifiable, Equatable {
 }
 
 /// A subcategory inside the budget sheet: its icon, name and share of the budget, with its
-/// amount right in the row. Tapped open: its name and icon, and Delete.
+/// amount right in the row. Tapped open: its name, its icon and color, and Delete.
 private struct SubcategoryEditorRow: View {
     @Binding var draft: SubcategoryDraft
     var status: CategoryStatus?
-    var color: CategoryColor
+    /// The budget's color, which its subcategories share.
+    @Binding var color: CategoryColor
     /// Its amount as a fraction of the budget's, when the budget has one.
     var share: Double?
     var budgetName: String
@@ -847,6 +852,7 @@ private struct SubcategoryEditorRow: View {
     var toggle: () -> Void
     var remove: () -> Void
     @FocusState private var amountFocused: Bool
+    @State private var pickingLook = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -915,10 +921,6 @@ private struct SubcategoryEditorRow: View {
         return parts.isEmpty ? "No amount yet" : parts.joined(separator: " · ")
     }
 
-    private var quickIcons: [String] {
-        SymbolChoices.quick.contains(draft.symbol) ? SymbolChoices.quick : [draft.symbol] + SymbolChoices.quick.prefix(11)
-    }
-
     private var editor: some View {
         VStack(spacing: 0) {
             Divider().padding(.leading, 16)
@@ -932,33 +934,22 @@ private struct SubcategoryEditorRow: View {
             .padding(.horizontal, 16)
             .frame(minHeight: 48)
             Divider().padding(.leading, 16)
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Icon")
-                ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
-                        ForEach(quickIcons, id: \.self) { option in
-                            IconChoiceButton(name: option, isSelected: option == draft.symbol, color: color) {
-                                withAnimation(.snappy) { draft.symbol = option }
-                            }
-                            .frame(width: 52)
-                            .accessibilityLabel(option.replacingOccurrences(of: ".", with: " "))
-                        }
-                        NavigationLink {
-                            IconLibraryView(selection: $draft.symbol, color: color)
-                        } label: {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(Brand.green)
-                                .frame(width: 52, height: 44)
-                                .background(Color(.systemGray6), in: .capsule)
-                        }
-                        .accessibilityLabel("More icons")
-                    }
-                }
-                .scrollIndicators(.hidden)
+            // Icon & Color: the shared Hearth picker. The color is the budget's, shared by
+            // all its subcategories.
+            Button { pickingLook = true } label: {
+                HearthIconColorLabel(icon: draft.symbol, color: color.hearthChoice)
             }
+            .buttonStyle(.plain)
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .frame(minHeight: 54)
+            .hearthIconColorPicker(
+                isPresented: $pickingLook,
+                title: draft.name.trimmingCharacters(in: .whitespaces).isEmpty ? "New subcategory" : draft.name,
+                caption: "Subcategory of \(budgetName)",
+                context: .budget,
+                icon: $draft.symbol,
+                color: $color.hearthChoice
+            )
             Divider().padding(.leading, 16)
             Button(role: .destructive, action: remove) {
                 Label("Delete Subcategory", systemImage: "trash")

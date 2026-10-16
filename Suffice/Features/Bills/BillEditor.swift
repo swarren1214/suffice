@@ -24,6 +24,8 @@ struct BillEditor: View {
     /// Custom was picked (or the saved schedule isn't one of the presets).
     @State private var isCustom = false
     @State private var color: CategoryColor = .blue
+    /// The Hearth color picker is open.
+    @State private var pickingColor = false
     @State private var categoryID: UUID?
     @State private var isAutopay = false
     @State private var isSubscription = false
@@ -191,9 +193,16 @@ struct BillEditor: View {
                     Text("Mark paid adds the payment to Activity in this category. Subscriptions are listed on their own.")
                 }
 
-                Section("Color") {
-                    ColorChoiceGrid(selection: $color)
-                        .padding(.vertical, 2)
+                Section {
+                    Button { pickingColor = true } label: {
+                        HearthColorSwatchLabel(color: color.hearthChoice)
+                    }
+                    .hearthColorPicker(
+                        isPresented: $pickingColor,
+                        title: name.trimmingCharacters(in: .whitespaces).isEmpty ? "New bill" : name,
+                        caption: "Bill",
+                        color: $color.hearthChoice
+                    )
                 }
 
                 Section {
@@ -211,18 +220,19 @@ struct BillEditor: View {
             .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", systemImage: "xmark") { dismiss() }
+                    SheetCancelButton { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", systemImage: "checkmark", role: .confirm) { save() }
+                    SheetDoneButton("Save") { save() }
                         .disabled(!isValid)
                 }
             }
-            .confirmationDialog("Delete \(name)?", isPresented: $confirmsDelete, titleVisibility: .visible) {
+            .alert("Delete \(name)?", isPresented: $confirmsDelete) {
                 Button("Delete Bill", role: .destructive) {
                     pendingDelete = true
                     dismiss()
                 }
+                Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Payments already recorded stay in Activity.")
             }

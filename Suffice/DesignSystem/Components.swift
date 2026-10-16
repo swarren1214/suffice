@@ -6,23 +6,37 @@ import SwiftUI
 
 /// The green header that fades into the gray background. Fixed behind the scroll view.
 struct HeaderGradient: View {
-    var height: CGFloat = 330
+    /// How far down the screen the color reaches before it's gone, as a share of the screen's
+    /// height: half on iPhone, 40% on iPad.
+    var fraction: CGFloat?
+
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        LinearGradient(
-            stops: [
-                .init(color: Brand.greenDeep, location: 0),
-                .init(color: Brand.greenMid, location: 0.58),
-                .init(color: Brand.greenMid.opacity(0), location: 1),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: height)
-        .frame(maxWidth: .infinity)
-        .ignoresSafeArea(edges: .top)
+        // On iPhone the color holds longer before it fades (eased), so it reads stronger in the
+        // shorter space; on iPad, an even fade from the very top to the very bottom.
+        let curve = sizeClass == .compact ? Self.phoneCurve : Self.evenCurve
+        let start = Brand.greenDeep
+        let end = Brand.greenMid
+        GeometryReader { geo in
+            LinearGradient(
+                stops: curve.map { point in
+                    Gradient.Stop(color: start.mix(with: end, by: point.location).opacity(point.opacity), location: point.location)
+                },
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(width: geo.size.width, height: geo.size.height * (fraction ?? (sizeClass == .compact ? 0.5 : 0.4)))
+        }
+        .ignoresSafeArea()
         .accessibilityHidden(true)
     }
+
+    /// The color's strength at points down the gradient (0 = top, 1 = where it's gone).
+    private static let phoneCurve: [(location: Double, opacity: Double)] = [
+        (0, 1), (0.3, 0.88), (0.6, 0.5), (0.85, 0.15), (1, 0),
+    ]
+    private static let evenCurve: [(location: Double, opacity: Double)] = [(0, 1), (1, 0)]
 }
 
 /// A tab's screen: the green header with a big white title (and an optional figure on the
@@ -32,6 +46,7 @@ struct GreenScreen<Content: View>: View {
     /// The widest the cards get (iPad, Mac). iPhones are narrower than this.
     static var readableWidth: CGFloat { 820 }
 
+    @Environment(\.colorScheme) private var colorScheme
     var title: String
     var trailing: String?
     @ViewBuilder var content: () -> Content
@@ -56,7 +71,8 @@ struct GreenScreen<Content: View>: View {
                             .monospacedDigit()
                     }
                 }
-                .foregroundStyle(.white)
+                // A touch softer in Light Mode, where pure white over the lighter green is glaring.
+                .foregroundStyle(.white.opacity(colorScheme == .light ? 0.88 : 1))
                 .padding(.horizontal, 4)
                 content()
             }
@@ -225,7 +241,7 @@ struct TintedCapsuleButton: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(Brand.green)
             .padding(.horizontal, 14)
-            .frame(height: 34)
+            .frame(minHeight: 34)
             .background(Brand.green.opacity(0.12), in: .capsule)
         }
         .buttonStyle(.plain)

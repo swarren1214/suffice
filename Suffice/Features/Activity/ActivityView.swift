@@ -157,13 +157,15 @@ private struct MonthActivity: View {
                     .buttonStyle(.plain)
                     .tint(.primary)
                     .contextMenu {
-                        Button("Delete", systemImage: "trash", role: .destructive) {
+                        Button("Delete", menuIcon: "trash", role: .destructive) {
                             Ledger.delete(entry, in: context)
                         }
                     }
                 }
             }
         }
+        // Pull down to fetch the latest from iCloud.
+        .refreshable { await HouseholdSync.shared.syncNow() }
         .sheet(item: $editing) { entry in
             TransactionSheet(entry: entry)
         }
