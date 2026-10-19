@@ -28,6 +28,8 @@ private struct MonthBudget: View {
     let month: MonthSpan
     @Query private var entries: [LedgerEntry]
     @Query(sort: \BudgetCategory.sortOrder) private var categories: [BudgetCategory]
+    @Query private var stashMoves: [StashMove]
+    @Query(filter: #Predicate<Stash> { $0.isArchived == false }) private var stashes: [Stash]
     @State private var opened: BudgetCategory?
 
     init(month: MonthSpan) {
@@ -41,11 +43,12 @@ private struct MonthBudget: View {
         let records = entries.map(\.record)
         let categoryRecords = categories.map(\.record)
         let statuses = BudgetMath.statuses(categoryRecords, entries: records, in: month)
-        let totals = BudgetMath.totals(categoryRecords, entries: records, in: month)
+        let totals = BudgetMath.totals(categoryRecords, entries: records, in: month, stashMoves: stashMoves.map(\.record))
         let lookup = Lookup(categories: categories)
+        let isThisMonth = month == MonthSpan(containing: .now)
 
         GreenScreen("Budget") {
-            BudgetSummaryCard(totals: totals, isThisMonth: month == MonthSpan(containing: .now))
+            BudgetSummaryCard(totals: totals, isThisMonth: isThisMonth, showsStashed: totals.stashedCents > 0 || !stashes.isEmpty)
 
             if statuses.isEmpty {
                 EmptyCard(systemName: "dollarsign.circle", title: "No budgets yet", message: "Tap + to plan what each part of the month gets.")
@@ -76,6 +79,12 @@ private struct MonthBudget: View {
                     .font(.subheadline)
                 }
             }
+
+            // Stashes are about now: what's set aside today for what's coming.
+            if isThisMonth {
+                StashesSection()
+                    .padding(.top, 10)
+            }
         }
         // Pull down to fetch the latest from iCloud.
         .refreshable { await HouseholdSync.shared.syncNow() }
@@ -85,26 +94,42 @@ private struct MonthBudget: View {
     }
 }
 
-/// The glass card at the top: what's left of the plan, a bar, then planned and spent.
+/// The glass card at the top: what's left of the plan, a bar, then planned, stashed and spent.
 private struct BudgetSummaryCard: View {
     var totals: MonthTotals
     var isThisMonth: Bool
+    /// The household has stashes (or counted some this month).
+    var showsStashed = false
 
     var body: some View {
         let isOver = totals.leftCents < 0
-        let progress = totals.budgetedCents > 0 ? Double(totals.spentCents) / Double(totals.budgetedCents) : 0
+        let used = totals.spentCents + totals.stashedCents
+        let progress = totals.budgetedCents > 0 ? Double(used) / Double(totals.budgetedCents) : 0
         GlassCard {
             GlassCardHeader(title: isOver ? "Over plan" : "Left to spend", note: isThisMonth ? "This month" : "That month")
             GlassFigure(text: Money.text(abs(totals.leftCents)), color: isOver ? Brand.expenseInk : .primary)
             if totals.budgetedCents > 0 {
                 ProgressBar(progress: progress, color: isOver ? Brand.expense : Brand.green, track: .primary.opacity(0.1))
             }
-            HStack(spacing: 10) {
-                GlassTile(title: "Planned", value: Money.whole(totals.budgetedCents))
-                GlassTile(title: "Spent", value: Money.whole(totals.spentCents))
+            // Three tiles across where they fit; stacked on the narrowest screens and the
+            // largest text sizes.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: showsStashed ? 8 : 10) { tiles }
+                VStack(spacing: 8) { tiles }
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var tiles: some View {
+        GlassTile(title: "Planned", value: Money.whole(totals.budgetedCents))
+            .frame(minWidth: 96)
+        if showsStashed {
+            GlassTile(title: "Stashed", value: Money.whole(totals.stashedCents))
+                .frame(minWidth: 96)
+        }
+        GlassTile(title: "Spent", value: Money.whole(totals.spentCents))
+            .frame(minWidth: 96)
     }
 }
 

@@ -37,6 +37,14 @@ final class AskData {
         (try? context.fetch(FetchDescriptor<Account>())) ?? []
     }
 
+    private var stashes: [Stash] {
+        ((try? context.fetch(FetchDescriptor<Stash>(sortBy: [SortDescriptor(\.sortOrder)]))) ?? []).filter { !$0.isArchived }
+    }
+
+    private var stashMoves: [StashMoveRecord] {
+        ((try? context.fetch(FetchDescriptor<StashMove>())) ?? []).map(\.record)
+    }
+
     static func month(monthsAgo: Int) -> MonthSpan {
         MonthSpan(containing: .now).offset(by: -max(monthsAgo, 0))
     }
@@ -122,7 +130,8 @@ final class AskData {
             let calendar = Calendar.current
             let lastMonth = month.offset(by: -1)
             let samePoint = calendar.date(byAdding: .month, value: -1, to: .now) ?? lastMonth.end
-            let spentBefore = entries(in: category, from: lastMonth.start, to: samePoint).reduce(0) { $0 + $1.amountCents }
+            let ids = budgetIDs(category)
+            let spentBefore = entries(in: category, from: lastMonth.start, to: samePoint).reduce(0) { $0 + $1.cents(in: ids) }
             lines.append("By this day last month, \(Money.text(spentBefore)) had been spent in it.")
         }
         for child in status.children { lines.append("Subcategory " + line(child)) }
@@ -169,8 +178,9 @@ final class AskData {
     func spendingText(monthsAgo: Int) -> String {
         let month = Self.month(monthsAgo: monthsAgo)
         let breakdown = breakdown(in: month)
-        let totals = BudgetMath.totals(categories.map(\.record), entries: entries.map(\.record), in: month)
+        let totals = BudgetMath.totals(categories.map(\.record), entries: entries.map(\.record), in: month, stashMoves: stashMoves)
         var lines = ["\(Self.monthName(month).capitalizedFirst): \(Money.text(totals.spentCents)) spent, \(Money.text(totals.incomeCents)) came in, \(Money.text(totals.budgetedCents)) planned."]
+        if totals.stashedCents > 0 { lines.append("Stashed for coming bills: \(Money.text(totals.stashedCents)).") }
         if !breakdown.rows.isEmpty {
             lines.append("By budget: " + breakdown.rows.map { "\($0.name) \(Money.text($0.cents))" }.joined(separator: ", "))
         }
@@ -190,7 +200,8 @@ final class AskData {
         let lookup = Lookup(categories: categories, members: members)
         let matches = entries.filter { entry in
             guard entry.date >= from else { return false }
-            let haystack = AskText.words([entry.payee, entry.note, lookup.budget(for: entry.categoryID)?.name ?? "", lookup.category(entry.categoryID)?.name ?? ""].joined(separator: " "))
+            let partNames = entry.record.parts.flatMap { [lookup.budget(for: $0.categoryID)?.name ?? "", lookup.category($0.categoryID)?.name ?? ""] }
+            let haystack = AskText.words(([entry.payee, entry.note] + partNames).joined(separator: " "))
             return words.allSatisfy { word in haystack.contains { $0.hasPrefix(word) } }
         }
         guard !matches.isEmpty else { return "No transactions match \"\(search)\" since \(from.formatted(.dateTime.month(.wide).year()))." }
@@ -209,11 +220,12 @@ final class AskData {
     func affordabilityText(dollars: Int) -> String {
         let month = MonthSpan(containing: .now)
         let all = statuses(in: month)
-        let leftInBudgets = all.filter { $0.limitCents > 0 }.reduce(0) { $0 + max($1.leftCents, 0) }
         let overBy = all.filter { $0.limitCents > 0 }.reduce(0) { $0 + max(-$1.leftCents, 0) }
         let records = entries.map(\.record)
         let cash = BudgetMath.totalCash(accounts.map(\.record), entries: records)
-        let totals = BudgetMath.totals(categories.map(\.record), entries: records, in: month)
+        let totals = BudgetMath.totals(categories.map(\.record), entries: records, in: month, stashMoves: stashMoves)
+        // This month's stash amounts are part of the plan, so they're not left to spend.
+        let leftInBudgets = max(all.filter { $0.limitCents > 0 }.reduce(0) { $0 + max($1.leftCents, 0) } - totals.stashedCents, 0)
         let payments = entries.filter { $0.billID != nil }.map(\.record)
         let today = Calendar.current.startOfDay(for: .now)
         let billsLeft = bills.reduce(0) { total, bill in
@@ -221,7 +233,7 @@ final class AskData {
                 .filter { BudgetMath.payment(for: bill.record, dueOn: $0, payments: payments) == nil }
                 .count * bill.amountCents
         }
-        let unplanned = totals.incomeCents - totals.budgetedCents
+        let unplanned = totals.incomeCents - totals.budgetedCents - totals.stashedCents
         return """
         Asked about: \(Money.text(dollars * 100)).
         Left in all budgets this month: \(Money.text(leftInBudgets))\(overBy > 0 ? " (budgets already over by \(Money.text(overBy)) in total)" : "").
@@ -230,6 +242,55 @@ final class AskData {
         Total cash in accounts: \(Money.text(cash)).
         \(Self.daysLeft) days left in the month.
         """
+    }
+
+    /// getStashes: what's stashed for the bills that come once or twice a year, and whether
+    /// each is on track.
+    func stashesText(named name: String = "") -> String {
+        let words = AskText.words(name)
+        let named = stashes.filter { stash in
+            let haystack = AskText.words(stash.name)
+            return words.allSatisfy { word in haystack.contains { $0.hasPrefix(word) } }
+        }
+        let all = named.isEmpty ? stashes : named
+        guard !all.isEmpty else { return "No stashes yet. A stash saves a little each month for a bill that comes once or twice a year (Budget › Stashes)." }
+        let moves = stashMoves
+        let paid = entries.filter { $0.stashID != nil }.map(\.record)
+        var lines = ["Stashes (today is \(Date.now.formatted(.dateTime.month().day().year()))):"]
+        for stash in all {
+            let summary = StashMath.summary(stash.record, moves: moves, entries: paid)
+            let due = stash.dueDate.formatted(.dateTime.month(.wide).day().year())
+            var line = "\(stash.name): \(Money.text(summary.balanceCents)) stashed of \(Money.text(stash.targetCents)), due \(due)"
+            if summary.monthlyCents > 0 { line += ", \(Money.text(summary.monthlyCents)) a month for \(summary.monthsLeft) more month\(summary.monthsLeft == 1 ? "" : "s")" }
+            line += ". \(summary.status.label)."
+            lines.append(line)
+        }
+        let month = MonthSpan(containing: .now)
+        lines.append("Stashed this month: \(Money.text(StashMath.stashed(moves, in: month))).")
+        return lines.joined(separator: "\n")
+    }
+
+    /// getRunway: how many months of essentials the emergency fund covers.
+    /// Counted toward stashes in `month` (part of the plan, so not left to spend).
+    func stashed(in month: MonthSpan) -> Int {
+        StashMath.stashed(stashMoves, in: month)
+    }
+
+    func runwayText() -> String {
+        let runway = EmergencyFund.runway(in: context)
+        guard let months = EmergencyFund.monthsText(runway) else {
+            return "Nothing is marked essential yet, so there's no runway number. Net Worth › Emergency fund picks what's essential."
+        }
+        var lines = [
+            "Emergency fund: \(Money.text(runway.savedCents)) saved, essentials \(Money.text(runway.essentialsCents)) a month, so it would last \(months) months.",
+            "Goal: \(runway.goalMonths) months.",
+        ]
+        if runway.gapCents > 0 {
+            lines.append("Short of the goal by \(Money.text(runway.gapCents)); \(Money.text(runway.monthlyToCloseCents)) a month closes it in a year.")
+        } else {
+            lines.append("Past the goal by \(Money.text(runway.overCents)).")
+        }
+        return lines.joined(separator: "\n")
     }
 
     // MARK: Cards
@@ -256,10 +317,12 @@ final class AskData {
     /// A budget's spending this month by payee, biggest first.
     func topPayees(in category: BudgetCategory, month: MonthSpan, limit: Int = 3) -> [Payee] {
         var byName: [String: Payee] = [:]
+        let ids = budgetIDs(category)
         for entry in entries(in: category, from: month.start, to: month.end) {
             let key = entry.payee.lowercased()
             var payee = byName[key] ?? Payee(name: entry.payee, cents: 0, count: 0)
-            payee.cents += entry.amountCents
+            // A split charge counts only its part in this budget.
+            payee.cents += entry.cents(in: ids)
             payee.count += 1
             byName[key] = payee
         }
@@ -275,15 +338,20 @@ final class AskData {
         let spending = entries.filter { $0.kind == .expense && month.contains($0.date) }
         var people: [Payee] = []
         for member in members {
-            let cents = spending.filter { $0.memberID == member.id }.reduce(0) { $0 + $1.amountCents }
+            let cents = spending.filter { $0.memberID == member.id }.reduce(0) { $0 + $1.record.spendingCents }
             if cents > 0 { people.append(Payee(name: member.name, cents: cents, count: 0)) }
         }
-        return Breakdown(month: month, totalCents: spending.reduce(0) { $0 + $1.amountCents }, rows: rows, people: people)
+        return Breakdown(month: month, totalCents: spending.reduce(0) { $0 + $1.record.spendingCents }, rows: rows, people: people)
+    }
+
+    /// A budget and its subcategories.
+    private func budgetIDs(_ category: BudgetCategory) -> Set<UUID> {
+        Set([category.id] + categories.filter { $0.parentID == category.id }.map(\.id))
     }
 
     private func entries(in category: BudgetCategory, from start: Date, to end: Date) -> [LedgerEntry] {
-        let ids = Set([category.id] + categories.filter { $0.parentID == category.id }.map(\.id))
-        return entries.filter { $0.kind == .expense && $0.date >= start && $0.date < end && $0.categoryID.map(ids.contains) == true }
+        let ids = budgetIDs(category)
+        return entries.filter { $0.kind == .expense && $0.date >= start && $0.date < end && $0.touches(ids) }
     }
 
     // MARK: Moving money between budgets

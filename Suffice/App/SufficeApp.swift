@@ -18,8 +18,12 @@ struct SufficeApp: App {
             HouseholdSync.shared.startForScreenshots()
         } else {
             StarterData.seedIfNeeded(in: container.mainContext)
-            // Fold together anything two devices both made, then sync the household with iCloud.
+            // Fold together anything two devices both made.
             SyncCleanup.mergeDuplicates(in: container.mainContext)
+            // Count the 1st for stashes that count on their own.
+            StashScheduler.run(in: container.mainContext)
+            // The budget syncs in the Hearth household's iCloud: its zone registers with the
+            // household before the household starts (AppRoot's task).
             HouseholdSync.shared.start(container)
         }
         // Alerts use the system label color rather than the brand green. Destructive buttons stay red.
@@ -134,6 +138,9 @@ final class AppRouter {
     /// Set by ⌘N; Activity opens a new transaction and clears it.
     var wantsNewTransaction = false
 
+    /// A bill shared or opened in Suffice; Bills reads it and clears it.
+    var incomingDocument: IncomingDocument?
+
     /// When a new transaction happens: now, or, while an earlier month is showing, today's
     /// day-of-month in that month (at noon), so back-filling last month lands in last month.
     var entryDate: Date {
@@ -152,15 +159,10 @@ struct AppRoot: View {
     @Environment(AppRouter.self) private var router
     @Environment(AppLock.self) private var lock
     @AppStorage(SettingsKey.onboarded) private var onboarded = false
+    /// The budget's sync (the Hearth container's Budget zone).
     @State private var household = HouseholdSync.shared
-    @Query(sort: \Member.sortOrder) private var members: [Member]
-    @AppStorage(SettingsKey.currentMember) private var currentMember = ""
-    @AppStorage(SettingsKey.askedWhoAmI) private var askedWhoAmI = false
-
-    /// Just joined a household and its people are here: ask which one is you.
-    private var asksWhoAmI: Bool {
-        onboarded && household.isMember && currentMember.isEmpty && !askedWhoAmI && !members.isEmpty
-    }
+    /// The Hearth household: the same family in every Hearth app. Suffice always has one.
+    @State private var family = HearthHouseholdStore.shared
 
     var body: some View {
         Group {
@@ -172,20 +174,11 @@ struct AppRoot: View {
         }
         .tint(Brand.green)
         .animation(.smooth, value: onboarded)
-        // A household invitation: joining replaces the budget on this device.
-        .alert(
-            "Join \(household.inviterName)’s household?",
-            // During onboarding, I Have an Invite shows it instead.
-            isPresented: Binding(get: { onboarded && household.pendingInvite != nil }, set: { if !$0 { household.pendingInvite = nil } })
-        ) {
-            Button("Not Now", role: .cancel) {}
-            Button("Join") {
-                // Dismissing the alert clears the pending invitation, so hand it over directly.
-                let invite = household.pendingInvite
-                Task { await household.acceptInvite(invite) }
-            }
+        // Joined a family's household and its budget arrived: say what happened to this one.
+        .alert("You’re in the Family Budget", isPresented: $household.showsJoinedNotice) {
+            Button("OK", role: .cancel) {}
         } message: {
-            Text("You’ll share one budget and both see every change. The budget on this \(DeviceName.current) is replaced by the shared one. Yours stays in your iCloud and comes back if you leave.")
+            Text("You share one budget with \(family.ownerName ?? "your family") and see every change. The budget on this \(DeviceName.current) is replaced by the shared one. Yours stays in your iCloud and comes back if you leave.")
         }
         .overlay {
             if household.isWorking {
@@ -195,11 +188,39 @@ struct AppRoot: View {
                     .background(.regularMaterial, in: .rect(cornerRadius: 20))
             }
         }
-        .sheet(isPresented: Binding(get: { asksWhoAmI }, set: { if !$0 { askedWhoAmI = true } })) {
-            WhoAreYouSheet(members: members)
+        // Hearth household invitations (the one invite for everything, the budget included),
+        // and keeping Suffice's people in step with the household.
+        .hearthHouseholdInvitations()
+        // Suffice always works inside a household (a household of one is fine).
+        .hearthHouseholdRequired(isActive: onboarded && !ScreenshotMode.isOn, accent: Brand.green)
+        // Suffice's side of a person's page in Household.
+        .environment(\.hearthPersonExtras, { person in AnyView(SufficePersonExtras(person: person)) })
+        .task {
+            guard !ScreenshotMode.isOn else { return }
+            family.start(app: .suffice)
+            household.householdDidStart()
+            SufficeHearthHousehold.sync(in: context)
         }
+        .onChange(of: family.snapshot) { SufficeHearthHousehold.sync(in: context) }
+        // The family's budget finished arriving: mirror its people now.
+        .onChange(of: household.isSettled) { _, settled in
+            if settled { SufficeHearthHousehold.sync(in: context) }
+        }
+        // Share the budget with the household's adults, or join the family's.
+        .onChange(of: family.mode) { Task { await household.updateSharing() } }
+        .onChange(of: family.exists) { Task { await household.updateSharing() } }
+        .onChange(of: family.participants.count) { Task { await household.updateSharing() } }
+        .onChange(of: family.info?.appShareURLs) { Task { await household.updateSharing() } }
         // Widgets open suffice://overview, suffice://budget or suffice://bills.
         .onOpenURL { url in
+            // A PDF or photo opened in Suffice (Share › Suffice, Open in Suffice): read it as a bill.
+            if url.isFileURL {
+                guard let document = IncomingDocument.load(url) else { return }
+                router.tab = .bills
+                router.showThisMonth()
+                router.incomingDocument = document
+                return
+            }
             guard url.scheme == WidgetLink.scheme else { return }
             switch url.host() {
             case "budget": router.tab = .budget
@@ -221,11 +242,19 @@ struct AppRoot: View {
             switch phase {
             case .active:
                 router.rollOverIfNeeded()
+                // A new month owes stashes their 1st.
+                if !ScreenshotMode.isOn { StashScheduler.run(in: context) }
                 // A new day changes which bills are due and late.
                 WidgetSync.refresh(context)
-                Task { await household.syncNow() }
+                Task {
+                    await household.syncNow()
+                    await household.updateSharing()
+                }
                 Task { await HearthSignIn.follow() }
                 HearthHousehold.publish(in: context)
+                SufficeHearthHousehold.sync(in: context)
+                // Allowance Caloma paid out, as expenses to review.
+                CalomaAllowance.importPayouts(in: context)
                 Task { await Reminders.refresh(context) }
                 // Connected banks, at most hourly.
                 Task {
@@ -233,6 +262,8 @@ struct AppRoot: View {
                         memberID: UUID(uuidString: UserDefaults.standard.string(forKey: SettingsKey.currentMember) ?? ""),
                         in: context
                     )
+                    // Then receipts and bills from email, matched to what the bank just sent.
+                    await ReceiptScanner.shared.scanIfStale(in: context)
                 }
                 // Only when coming back from the background: the Face ID prompt itself
                 // passes through inactive, and cancelling it shouldn't bring it back.

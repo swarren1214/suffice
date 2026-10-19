@@ -2,7 +2,8 @@ import CloudKit
 import UIKit
 
 /// Push notifications (CKSyncEngine hears about changes in iCloud through them) and the scene
-/// delegate that receives household invitations.
+/// delegate that receives Hearth household invitations. The budget needs no invitation of its
+/// own: it's shared with the household automatically (`HouseholdSync`).
 final class SufficeAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         application.registerForRemoteNotifications()
@@ -20,12 +21,14 @@ final class SufficeAppDelegate: NSObject, UIApplicationDelegate {
 /// running or not.
 final class SufficeSceneDelegate: NSObject, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        if let metadata = connectionOptions.cloudKitShareMetadata {
-            HouseholdSync.shared.receive(metadata)
+        if let metadata = connectionOptions.cloudKitShareMetadata, HearthHouseholdStore.handles(metadata) {
+            HearthHouseholdStore.shared.receive(metadata)
         }
     }
 
     func windowScene(_ windowScene: UIWindowScene, userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata) {
-        HouseholdSync.shared.receive(cloudKitShareMetadata)
+        if HearthHouseholdStore.handles(cloudKitShareMetadata) {
+            HearthHouseholdStore.shared.receive(cloudKitShareMetadata)
+        }
     }
 }

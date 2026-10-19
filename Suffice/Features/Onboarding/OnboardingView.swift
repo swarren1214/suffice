@@ -2,16 +2,17 @@ import AuthenticationServices
 import SwiftData
 import SwiftUI
 
-/// First run, from the "Suffice Onboarding & Tour" designs: Welcome, then six steps that end
-/// with a real plan (who's budgeting, inviting your partner, accounts, the month's plan, bills,
-/// reminders) and All set. "I Have an Invite" on Welcome is the partner's way in instead.
+/// First run, from the "Suffice Onboarding & Tour" designs: Welcome, then the steps that end
+/// with a real plan (your household, accounts, the month's plan, bills, reminders) and All set.
 ///
-/// Onboarding is always dark, like the designs. Every step after Welcome can be skipped;
-/// nothing is required but your name.
+/// The household step is the Hearth household's (`HearthHouseholdOnboarding`): set one up (a
+/// household of one is fine) or join the family's with their invitation. Joining shares the
+/// family's budget too; there's no second invite.
+///
+/// Onboarding is always dark, like the designs. Every step after the household can be skipped.
 struct OnboardingView: View {
     @AppStorage(SettingsKey.onboarded) private var onboarded = false
     @State private var flow = OnboardingFlow()
-    @State private var household = HouseholdSync.shared
 
     var body: some View {
         ZStack {
@@ -26,19 +27,13 @@ struct OnboardingView: View {
         .environment(flow)
         .environment(\.colorScheme, .dark)
         .tint(OnboardingStyle.accent)
-        // Someone tapped a household invitation: show it here rather than as an alert.
-        .onChange(of: household.pendingInvite != nil, initial: true) { _, invited in
-            if invited, flow.screen != .invite { flow.go(to: .invite) }
-        }
     }
 
     @ViewBuilder
     private var screen: some View {
         switch flow.screen {
         case .welcome: OnboardingWelcome()
-        case .invite: OnboardingInvite()
-        case .household: OnboardingHousehold()
-        case .partner: OnboardingPartner()
+        case .household: HearthHouseholdOnboarding(accent: Brand.green, onContinue: flow.next)
         case .connect: OnboardingConnect()
         case .plan: OnboardingPlan()
         case .bills: OnboardingBills()
@@ -56,21 +51,12 @@ struct OnboardingView: View {
 @Observable
 final class OnboardingFlow {
     enum Screen: Hashable {
-        case welcome, invite, household, partner, connect, plan, bills, alerts, ready
+        case welcome, household, connect, plan, bills, alerts, ready
     }
 
     private(set) var screen: Screen = .welcome
     /// Which way the last move went, for the slide.
     private(set) var isForward = true
-
-    // Who's budgeting
-    var myName = ""
-    var partnerName = ""
-    var myPhoto: Data?
-    var partnerPhoto: Data?
-    /// The people saved so far, so going back and renaming updates them instead of adding more.
-    var myID: UUID?
-    var partnerID: UUID?
 
     // Plan and bills, worked out once from the bank history and kept while going back and forth.
     var planRows: [PlanRow]?
@@ -78,17 +64,9 @@ final class OnboardingFlow {
     var foundBills: [SpendingHistory.FoundBill]?
     var keptBills: Set<UUID> = []
 
-    var partner: String? {
-        let name = partnerName.trimmingCharacters(in: .whitespaces)
-        return name.isEmpty ? nil : name
-    }
-
-    /// The numbered steps: Invite only when there's a partner to invite.
+    /// The numbered steps.
     var steps: [Screen] {
-        var steps: [Screen] = [.household]
-        if partner != nil { steps.append(.partner) }
-        steps += [.connect, .plan, .bills, .alerts]
-        return steps
+        [.household, .connect, .plan, .bills, .alerts]
     }
 
     func go(to screen: Screen) {
@@ -106,7 +84,7 @@ final class OnboardingFlow {
 
     func next() {
         switch screen {
-        case .welcome, .invite: go(to: .household)
+        case .welcome: go(to: .household)
         case .alerts: go(to: .ready)
         case .ready: break
         default:

@@ -30,11 +30,24 @@ struct BillEditor: View {
     @State private var isAutopay = false
     @State private var isSubscription = false
     @State private var note = ""
+    @State private var payURL = ""
     @State private var confirmsDelete = false
     @State private var pendingDelete = false
+    /// A new bill started from one Suffice read: its name, amount and due date.
+    private var suggestedName = ""
+    private var suggestedAmountCents = 0
+    private var suggestedDue: Date?
 
-    init(bill: Bill?) {
+    /// Set when another sheet shows this bill: it deletes the bill once both are closed.
+    private var onDelete: (() -> Void)?
+    @State private var loaded = false
+
+    init(bill: Bill?, suggestedName: String = "", suggestedAmountCents: Int = 0, suggestedDue: Date? = nil, onDelete: (() -> Void)? = nil) {
         self.bill = bill
+        self.onDelete = onDelete
+        self.suggestedName = suggestedName
+        self.suggestedAmountCents = suggestedAmountCents
+        self.suggestedDue = suggestedDue
     }
 
     private enum AmountField { case amount, minimum, maximum }
@@ -123,7 +136,14 @@ struct BillEditor: View {
     }
 
     private var isValid: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty && amountCents > 0 && rangeProblem == nil
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && amountCents > 0 && rangeProblem == nil && payProblem == nil
+    }
+
+    /// A Pay at address that isn't a web address.
+    private var payProblem: String? {
+        let trimmed = payURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return Bill.payLink(from: trimmed) == nil ? "That doesn’t look like a website." : nil
     }
 
     var body: some View {
@@ -206,6 +226,18 @@ struct BillEditor: View {
                 }
 
                 Section {
+                    TextField("Website, like xpressbillpay.com", text: $payURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("Pay at")
+                } footer: {
+                    Text(payProblem ?? "Where you pay it online. Pay on the bill opens it, or its app when it has one.")
+                        .foregroundStyle(payProblem == nil ? Color.secondary : Brand.expenseInk)
+                }
+
+                Section {
                     TextField("Note", text: $note, axis: .vertical)
                 }
 
@@ -229,7 +261,7 @@ struct BillEditor: View {
             }
             .alert("Delete \(name)?", isPresented: $confirmsDelete) {
                 Button("Delete Bill", role: .destructive) {
-                    pendingDelete = true
+                    if let onDelete { onDelete() } else { pendingDelete = true }
                     dismiss()
                 }
                 Button("Cancel", role: .cancel) {}
@@ -257,7 +289,19 @@ struct BillEditor: View {
     }
 
     private func load() {
-        guard let bill else { return }
+        // The Repeats list is pushed: coming back mustn't undo edits.
+        guard !loaded else { return }
+        loaded = true
+        guard let bill else {
+            // Started from a bill Suffice read: a variable monthly bill on its due day.
+            if !suggestedName.isEmpty || suggestedAmountCents > 0 {
+                name = suggestedName
+                amountText = Money.field(suggestedAmountCents)
+                isVariable = true
+                if let suggestedDue { firstDue = Calendar.current.startOfDay(for: suggestedDue) }
+            }
+            return
+        }
         name = bill.name
         amountText = Money.field(bill.amountCents)
         isVariable = bill.isVariable
@@ -281,6 +325,7 @@ struct BillEditor: View {
         isAutopay = bill.isAutopay
         isSubscription = bill.isSubscription
         note = bill.note
+        payURL = bill.payURL
     }
 
     private func save() {
@@ -309,6 +354,7 @@ struct BillEditor: View {
         target.isAutopay = isAutopay
         target.isSubscription = isSubscription
         target.note = note
+        target.payURL = payURL.trimmingCharacters(in: .whitespacesAndNewlines)
         try? context.save()
         dismiss()
     }

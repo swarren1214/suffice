@@ -35,7 +35,30 @@ Entertainment (Streaming, Date night) and Giving.
 
 - **Overview**: the Liquid Glass Total cash card (checking, savings and cash that are in the budget)
   with this month's income and expenses, then accounts grouped by bank. A bank with several
-  accounts opens to In budget / Hidden switches.
+  accounts opens to In budget / Hidden switches. Under the cards: the Net worth card, the
+  accounts, and Loans.
+- **Net Worth** (Overview › Net worth): everything owned minus everything owed in the glass
+  card, how it moved since last month, a month-by-month trend (6M / 1Y / All), then Assets
+  (every account, in the budget or not, plus homes, cars and investments typed in by hand) and
+  Debts (loans with their paid-off rings, credit cards with what's owed).
+- **Emergency Fund** (Net Worth › Emergency fund): months of essentials the household could
+  cover from savings if both paychecks stopped, a gauge with the goal marked, saved and
+  essentials a month. Below: the goal (1–12 months) and what closing the gap in a year takes,
+  with Stash to start a stash for it; which accounts count (savings on to begin with); and
+  which budgets are essential (Home, Utilities, Auto and Groceries to begin with), plus loan
+  payments and yearly stashes at their cost ÷ 12.
+- **Debts** (Net Worth › See all, Overview › Loans › All Debts): what's left on every loan and
+  when the last is paid off, each loan as a tile with its ring, a payoff timeline, and a tip
+  when rolling a finished loan's payment into the biggest one saves a year or more.
+- **Loan** (tap a loan): balance and share paid off, the facts (borrowed, term, time left,
+  interest paid and still ahead, escrow, the saved plan), how the next payment splits between
+  principal and interest, each year's payments as a stacked chart, and the amortization
+  schedule by year or by month. Edit opens the loan editor.
+- **Payoff Plan** (a loan › Plan a Payoff): pick any loan, then try extra each month, a
+  one-time payment, a refinance rate and biweekly payments. Shows the new payoff date, time and
+  interest saved, the balance over time against the schedule, and a side-by-side comparison.
+  Save as My Plan keeps the extra on the loan (its projections use it); Add Extra Payment to
+  Bills adds a monthly bill for it.
 - **Activity**: a segmented New / All switch. New (anything that arrived on its own or has no
   category) has a red badge with the count.
   Rows have the merchant avatar with the person's badge, date and account, and a red or green
@@ -43,9 +66,42 @@ Entertainment (Streaming, Date night) and Giving.
 - **Transaction sheet**: merchant, big amount, date · who · account, the category pill that
   opens into the list, the subcategory, "Always use this category for …", and the map when a
   transaction has a place. The same sheet adds new ones.
+- **Split** (transaction › Split Across Budgets, or Split From This Receipt): one charge across
+  budgets. Parts each have a budget or subcategory and an amount; Done is enabled once they add
+  up to the charge. The first part is "the rest" until its amount is typed, so splitting off one
+  thing is a budget and an amount; Split Evenly and Rest to Last Part help. With a receipt, the
+  on-device model reads the items and suggests the parts (`Services/ReceiptSplitter.swift`:
+  Vision reads the text, the model sorts items into budgets, prices are scaled to the charge so
+  tax spreads by size). A split charge stays one row in Activity ("Split · Food, Home"); each
+  budget counts only its part and lists it as "Part of a $214.37 split". Removing parts down to
+  one undoes the split.
 - **Budget**: what's left this month at the top right, then each budget as a tile in a
   two-column grid: its ring and icon, name, what's left (green, or red when over) and spent of
-  planned. Tapping a tile opens the budget sheet; **+** opens a new one.
+  planned. Tapping a tile opens the budget sheet; **+** opens a new one. Left to spend is
+  planned, less what went to stashes this month, less spent (the Stashed tile).
+- **Stashes** (Budget › Stashes, this month): money set aside month by month for costs that
+  come once or twice a year. Each has a ring, what's stashed of its target and its date, the
+  monthly amount and On track / Behind / Fully stashed. A card suggests one for a bill that
+  comes every three months or less often with two or more 1sts to go; Not Now remembers it.
+  The stash sheet shows the amount each month with a bar per month, then the amount, due date,
+  Every year / Just once, what's already stashed, the account it's kept in, and Count it on
+  the 1st (off: Mark Stashed each month). Bills › a bill › Stash for This opens one for it; a
+  bill with a stash shows "Saving $48/mo". When the bill is paid (Mark Paid or matched from the
+  bank) it's paid from the stash, so it doesn't count against that month's budget; a yearly
+  stash then starts over for next year. Other spending can be paid from a stash with the
+  transaction's Paid From row.
+- **Tax tags** (transaction › Tax): a tag on spending (charitable giving, medical, HSA or FSA
+  eligible, childcare, education, business). Tags never change budgets. The Tax row opens into
+  the tags like the category list; "Always tag ‹payee› as ‹tag›" makes a payee rule and offers
+  to tag this year's earlier ones; a tagged transaction without a receipt shows Keep the
+  Receipt with Scan. A split's parts can carry their own tags, and a budget can have one
+  (budget sheet › Tax Tag). A new transaction gets its own tag, else its payee rule's, else its
+  budget's, stamped when it's saved or arrives from the bank.
+- **Tax Year** (Profile › Tax Year): a year of tagged spending: the total with a bar by tag and
+  how many have receipts, the ones without a receipt, each tag's total and transactions,
+  mortgage and student loan interest from the loans' schedules (an estimate; the lender's Form
+  1098 is the official figure), the rules, and Share With Your Tax Preparer: a PDF summary, a
+  spreadsheet of every tagged transaction or split part, and the receipts as JPEGs.
 - **Budget sheet**: the big ring, the name (editable in place), what's left, and spent of
   planned with the days to go. Below it the budget's settings: monthly amount, Every month /
   One month only with its start month, "Part of" for making it a subcategory, color, and
@@ -101,20 +157,51 @@ or a person never deletes history, and CloudKit has no required relationships to
 - `BudgetCategory`: name, icon, color, monthly amount, parent (for subcategories), start
   month, repeats, order, archived.
 - `LedgerEntry`: date, payee, amount, expense or income, category, member, account, note,
-  bill, reviewed, place.
+  bill, reviewed, place, and `splitsJSON`: a split charge's parts (`EntrySplit`: budget and
+  amount), two or more adding up to the amount, with `categoryID` set to the biggest part's.
+  BudgetMath counts each part toward its own budget (`EntryRecord.parts`). When the bank changes
+  a split charge's amount, the last part takes the difference and it goes back to New.
 - `Bill`: name, amount, schedule (frequency, interval, first due date, optional end date, due
   day), color, category, autopay, subscription. Payments are `LedgerEntry`s with `billID` and
   the `billDueDate` they pay.
 - `Account`: bank, name, last four, type, source (manual, Plaid, Wallet), balance and its
   date, in budget.
-- `PayeeRule`: "always use this category" for a payee.
+- `PayeeRule`: "always use this category" and "always tag as" for a payee (`taxTagRaw`).
+- `Stash`: name, icon, color, target, due date, repeats yearly, what was already stashed, the
+  account it's kept in, the bill it pays, counts on the 1st, essential, archived. Its balance is
+  what it started with plus its `StashMove`s less what it paid for (`LedgerEntry.stashCents`).
+- `StashMove`: one month's amount counted toward a stash. Two devices can both count the same
+  1st; `SyncCleanup` keeps the oldest.
+- New fields: `LedgerEntry.stashID`/`stashCents` (paid from a stash: that much doesn't count in
+  the month's budget) and `taxTagRaw`; `EntrySplit.taxTag`; `BudgetCategory.isEssential` (nil
+  until picked) and `taxTagRaw`; `Account.isEmergencyFund` (nil until picked). The runway goal,
+  whether loan payments are essential and dismissed stash suggestions are in iCloud key-value
+  storage (`PlanningSettings`).
+- `Loan`: name, lender, type, color, amount borrowed, rate, term, first payment date, payment
+  (principal and interest), escrow, the balance on a date, the saved extra, paid off. Today's
+  balance is that balance less the scheduled payments due since (`LoanMath.currentBalance`);
+  typing in a statement's balance starts the count again.
+- `OwnedAsset`: a home, vehicle, investment or other, with its value and the date it was set.
+- `NetWorthSnapshot`: one month's assets and debts, rewritten as this month's totals change,
+  for the trend. Two devices may write one for the same month; the latest wins when read.
 - `Member`: name, color, and an optional profile photo. Photos are cropped to a 400 px
   square JPEG (`MemberPhoto`) and stored with `@Attribute(.externalStorage)`, which CloudKit
   syncs as an asset. Pick one by tapping a person's circle in Who's budgeting? or in
   Profile › My info / Household; it shows on their transaction badges, the toolbar avatar
   and Profile.
 
-Every property has a default and nothing is unique, so all six sync with CloudKit as-is.
+Every property has a default and nothing is unique, so they all sync with CloudKit as-is.
+
+Loan and net worth arithmetic is in `Models/LoanMath.swift` (pure functions, pinned by
+`SufficeTests/LoanMathTests.swift`): interest is the balance times the monthly rate, rounded to
+the cent; a calculated payment rounds up so the loan ends within its term; biweekly payments
+count as a thirteenth payment a year spread across the twelve; a refinance keeps the time left.
+
+Stashes, the emergency fund and tax tags have their own pure files: `Models/StashMath.swift`
+(a stash's monthly amount is what's still needed over the 1sts left, due month included,
+rounded up to the dollar), `Models/RunwayMath.swift` and `Models/TaxMath.swift`, pinned by
+`StashMathTests`, `RunwayMathTests` and `TaxMathTests`. `Services/Planning/StashScheduler.swift`
+counts the 1st on launch, on foreground and after household sync, and pays bills from stashes.
 
 ## iCloud sync and household sharing
 
@@ -167,6 +254,7 @@ Suffice/
   App/            App entry, router, tab bar, configuration, preview data
   DesignSystem/   Brand, category and member colors, header, cards, pills, rings, toolbar
   Features/       Onboarding (welcome, household, lock), Overview (accounts, connect),
+                  NetWorth (net worth, debts, loan, payoff plan, loan and asset editors),
                   Activity (list, transaction sheet), Budget (tiles, budget sheet), Bills,
                   Search, Profile
   Models/         SwiftData models, budget math, persistence and starter budgets
@@ -305,3 +393,46 @@ Banks connect through Plaid (`Services/BankSync/`, LinkKit 7 via Swift Package M
 Still to do: keeping transfers and card payments from counting as spending or income, OAuth
 banks (needs `PLAID_REDIRECT_URI` on the API plus an Associated Domains universal link), and
 letting a spouse sync banks the other person connected (only the connecting Apple ID can).
+
+## Bills & Receipts
+
+### Reading bills
+
+- **Where bills come from.** A bill PDF or photo can be shared or opened into Suffice (Share › Suffice, or Files › Open In), scanned on the Bill sheet, or found in email. Suffice reads it on the device: PDFKit text, Vision for scans, and the FoundationModels `DocumentReading` schema (`Services/Documents/DocumentReader.swift`).
+- **Where it's saved.** Each one becomes a `BillStatement` (synced, document as a CloudKit asset) on the matching bill: the amount, due date, period, and charges.
+- **How it changes paying.** A variable bill with a statement within 10 days of its due date pays that amount (`StatementMath`), and the statement goes with the payment as its receipt. Bills shows "From your Oct bill · usually ~$150"; the Bill sheet shows the statement, its charges and a history chart.
+- **Pay links.** A bill can keep a pay link (`Bill.payURL`, https only). Its Pay ↗ button opens the biller's own page. Suffice never moves money.
+
+### Receipts from Email (Profile › Receipts from Email)
+
+- **What it does.** Gmail and Outlook connect read-only (OAuth with PKCE in `ASWebAuthenticationSession`). Tokens are kept in this device's Keychain and never sync.
+- **What gets read.** `ReceiptScanner` searches only for receipt, order and bill words, then reads up to 60 new messages per scan on the device. It runs on opening the app (at most every 6 hours, after bank sync) and on pull-to-refresh in Email Receipts.
+- **Matching.** `ReceiptMatcher` matches each receipt against transactions:
+  - Same amount, store and day is a **sure** match and attaches on its own (Settings: "Attach when it's sure").
+  - Tips, two charges, dates a few days apart, or names that differ are **check** matches and wait for Attach or Not This One.
+  - Receipts with no transaction wait 30 days.
+- **Bills in email.** Bills found in email become statements ("Find bills too").
+- **Where found receipts live.** `FoundReceipt` is local-only and not in `SyncRegistry`: it remembers which messages were read. The attached receipt itself syncs on the transaction (`receiptData`, `receiptSourceRaw = "email"`, `receiptLink`).
+
+### Setting up the OAuth clients (needed before Connect turns on)
+
+Fill in `AppConfig.googleClientID` and `AppConfig.microsoftClientID`. While either is empty, its Connect button stays off.
+
+**Google**
+
+1. In Google Cloud Console, create a project and enable the Gmail API.
+2. Set up the OAuth consent screen and add the scope `https://www.googleapis.com/auth/gmail.readonly`.
+3. Create an **iOS** OAuth client for bundle ID `com.stephenwarren.suffice` and copy its client ID.
+4. Nothing goes in URL Types. The sign-in sheet catches the reversed client ID (`com.googleusercontent.apps.<id>`) itself.
+5. Know the limits. `gmail.readonly` is a *restricted* scope: until Google verifies the app (including a yearly CASA security assessment), only test users you list can connect, up to 100 of them. That covers you and your wife.
+
+**Microsoft**
+
+1. In Entra ID › App registrations, register an app and allow "Accounts in any organizational directory and personal Microsoft accounts".
+2. Add the **iOS/macOS** platform with bundle ID `com.stephenwarren.suffice`. Its redirect is `msauth.com.stephenwarren.suffice://auth`.
+3. Add the delegated permissions `Mail.Read`, `User.Read` and `offline_access`.
+4. Copy the Application (client) ID.
+
+**CloudKit**
+
+`BillStatement` is a new record type, and `LedgerEntry` (`receiptSourceRaw`, `receiptLink`) and `Bill` (`payURL`) have new fields. Run the schema seed (Profile › CloudKit (Debug)) on a development build, then deploy the schema to Production in the CloudKit Console before shipping.

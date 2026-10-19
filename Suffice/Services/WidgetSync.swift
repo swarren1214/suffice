@@ -21,6 +21,8 @@ enum WidgetSync {
         // Screenshot mode's demo household stays out of the widgets and the watch.
         guard !ScreenshotMode.isOn else { return }
         let snapshot = makeSnapshot(context, now: now)
+        // BigTable shows the groceries budget on its grocery list.
+        BigTableGroceries.publishBudget(snapshot.budgets, now: now)
         if WidgetStore.save(snapshot) {
             WidgetCenter.shared.reloadAllTimelines()
             // The watch app and its complications get the same numbers.
@@ -36,10 +38,11 @@ enum WidgetSync {
         let accounts = (try? context.fetch(FetchDescriptor<Account>())) ?? []
         let bills = (try? context.fetch(FetchDescriptor<Bill>(predicate: #Predicate { $0.isActive == true }))) ?? []
         let entries = ((try? context.fetch(FetchDescriptor<LedgerEntry>())) ?? []).map(\.record)
+        let moves = ((try? context.fetch(FetchDescriptor<StashMove>())) ?? []).map(\.record)
 
         let categoryRecords = categories.map(\.record)
         let statuses = BudgetMath.statuses(categoryRecords, entries: entries, in: month, calendar: calendar)
-        let totals = BudgetMath.totals(categoryRecords, entries: entries, in: month, calendar: calendar)
+        let totals = BudgetMath.totals(categoryRecords, entries: entries, in: month, stashMoves: moves, calendar: calendar)
         let byID = Dictionary(categories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         let budgets = statuses.compactMap { status -> WidgetSnapshot.Budget? in
@@ -81,7 +84,9 @@ enum WidgetSync {
         return WidgetSnapshot(
             updated: now,
             month: month.start,
-            budgetedCents: totals.budgetedCents,
+            // What's planned for spending: the month's stash amounts come out first, so the
+            // widget's Left to spend matches Budget's.
+            budgetedCents: totals.budgetedCents - totals.stashedCents,
             spentCents: totals.spentCents,
             incomeCents: totals.incomeCents,
             cashCents: BudgetMath.totalCash(accounts.map(\.record), entries: entries),

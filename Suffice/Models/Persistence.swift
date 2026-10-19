@@ -11,6 +11,14 @@ enum Persistence {
         Account.self,
         PayeeRule.self,
         LinkedBank.self,
+        Loan.self,
+        OwnedAsset.self,
+        NetWorthSnapshot.self,
+        Stash.self,
+        StashMove.self,
+        BillStatement.self,
+        // On this device only: not synced.
+        FoundReceipt.self,
     ])
 
     private static let log = Logger(subsystem: "com.stephenwarren.suffice", category: "persistence")

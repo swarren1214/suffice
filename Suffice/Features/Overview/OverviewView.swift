@@ -4,7 +4,8 @@ import UIKit
 
 /// Overview: the account cards. All accounts comes first (Total cash, this month's income and
 /// expenses); swipe for each account, its card colored from its bank's logo. Under the cards,
-/// whatever fits the card in front: every account's In budget switch, or one account's
+/// whatever fits the card in front: net worth, every account's In budget switch and the loans
+/// (Features/NetWorth), or one account's
 /// switch, card color, this month's money in and out, and its latest transactions. That part
 /// scrolls on its own, fading out as it passes under the cards.
 struct OverviewView: View {
@@ -136,6 +137,9 @@ struct OverviewView: View {
 
     private var allAccounts: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Net worth first: everything owned minus owed, opening Net Worth.
+            NetWorthCard()
+                .padding(.bottom, 8)
             SectionTitle(title: "Accounts") {
                 TintedCapsuleButton(title: "Add", systemImage: "plus") { showsConnect = true }
             }
@@ -152,6 +156,8 @@ struct OverviewView: View {
                     .foregroundStyle(Brand.secondaryText)
                     .padding(.horizontal, 6)
             }
+            LoansSection()
+                .padding(.top, 12)
         }
     }
 

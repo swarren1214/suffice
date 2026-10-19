@@ -31,9 +31,10 @@ nonisolated enum ScreenshotMode {
 
     /// Where the real values of the settings below wait while screenshot mode borrows them.
     private static let savedSettingsKey = "screenshots.savedSettings"
-    /// The settings screenshot mode changes. "household.memberOf" is HouseholdSync's.
+    /// The settings screenshot mode changes. "budget.joinedOwner" is HouseholdSync's
+    /// (`HouseholdSync.joinedOwnerKey`).
     private static let borrowedKeys = [
-        SettingsKey.onboarded, SettingsKey.faceIDLock, SettingsKey.appleUserID, SettingsKey.currentMember, "household.memberOf",
+        SettingsKey.onboarded, SettingsKey.faceIDLock, SettingsKey.appleUserID, SettingsKey.currentMember, "budget.joinedOwner",
     ]
 
     /// At launch, before anything reads them: the settings that would otherwise show onboarding,
@@ -61,7 +62,7 @@ nonisolated enum ScreenshotMode {
         defaults.set(true, forKey: SettingsKey.onboarded)
         defaults.set(false, forKey: SettingsKey.faceIDLock)
         defaults.set("screenshots-demo", forKey: SettingsKey.appleUserID)
-        defaults.removeObject(forKey: "household.memberOf")
+        defaults.removeObject(forKey: "budget.joinedOwner")
         // SettingsKey.currentMember is set to the demo person when the household is seeded.
         #endif
     }
@@ -79,7 +80,7 @@ extension View {
         navigationDestination(for: ScreenshotRoute.self) { route in
             switch route {
             case .profile: ProfileView()
-            case .household: HouseholdView()
+            case .household: HearthHouseholdView(accent: Brand.green)
             }
         }
     }

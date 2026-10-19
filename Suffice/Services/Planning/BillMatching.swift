@@ -22,6 +22,8 @@ enum BillMatcher {
             entry.billID = bill.id
             entry.billDueDate = due
             if entry.categoryID == nil { entry.categoryID = bill.categoryID }
+            // A bill with a stash is paid from it.
+            StashScheduler.payBill(entry, in: context, calendar: calendar)
             payments.append(entry.record)
         }
     }

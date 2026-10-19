@@ -16,6 +16,16 @@ enum AppConfig {
     /// have. Empty shows initials instead.
     nonisolated static let logoDevPublishableKey = "pk_WdicpzisRSC2-QwpXtq6FA"
 
+    /// Receipts from Email: the OAuth client IDs Suffice signs in to mailboxes with (read-only).
+    /// Empty leaves that mailbox's Connect off. See README › Receipts from email for setting
+    /// them up.
+    /// - Google: an iOS OAuth client in Google Cloud ("….apps.googleusercontent.com") with the
+    ///   Gmail API on and the gmail.readonly scope on the consent screen.
+    /// - Microsoft: an app registration in Microsoft Entra with the iOS redirect URI
+    ///   msauth.com.stephenwarren.suffice://auth and Mail.Read + User.Read (delegated).
+    nonisolated static let googleClientID = ""
+    nonisolated static let microsoftClientID = ""
+
     static let appName = "Suffice"
 
     static var version: String {

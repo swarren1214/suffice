@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Welcome: the promise, a glimpse of the app (what's left to spend, a budget, a bill), and two
-/// ways in: Get Started, or I Have an Invite for a partner joining an existing budget.
+/// Welcome: the promise, a glimpse of the app (what's left to spend, a budget, a bill), and Get
+/// Started. Joining the family's budget happens in the household step (its invitation).
 struct OnboardingWelcome: View {
     @Environment(OnboardingFlow.self) private var flow
     @State private var height: CGFloat = 844
@@ -44,12 +44,6 @@ struct OnboardingWelcome: View {
             VStack(spacing: 12) {
                 Button("Get Started") { flow.go(to: .household) }
                     .buttonStyle(.onboarding())
-                Button {
-                    flow.go(to: .invite)
-                } label: {
-                    Label("I Have an Invite", systemImage: "person.2.fill")
-                }
-                .buttonStyle(.onboarding(.secondary))
                 Text("Your budget lives in your own iCloud. No ads, no tracking.")
                     .font(.system(size: 12))
                     .foregroundStyle(OnboardingStyle.tertiaryText)
@@ -149,135 +143,5 @@ private struct WelcomeHero: View {
         .background(OnboardingStyle.card, in: .rect(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.08)))
         .shadow(color: .black.opacity(0.35), radius: 14, y: 8)
-    }
-}
-
-/// I Have an Invite: how to open the invitation your partner sent, and joining once it's here.
-/// The invitation arrives through the scene delegate (`HouseholdSync.receive`); joining
-/// finishes onboarding, and the tabs ask which person you are.
-struct OnboardingInvite: View {
-    @Environment(OnboardingFlow.self) private var flow
-    @State private var household = HouseholdSync.shared
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Button {
-                household.pendingInvite = nil
-                flow.back()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: 44, height: 44)
-                    .background(.white.opacity(0.12), in: .circle)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Back")
-            .padding(.top, 8)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    Image(systemName: household.pendingInvite == nil ? "envelope.open.fill" : "person.2.fill")
-                        .font(.system(size: 34, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 76, height: 76)
-                        .background(
-                            LinearGradient(colors: [Color(hex: 0x2CB855), Brand.greenDeep], startPoint: .top, endPoint: .bottom),
-                            in: .rect(cornerRadius: 18, style: .continuous)
-                        )
-                        .contentTransition(.symbolEffect(.replace))
-                        .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(household.pendingInvite == nil ? "Join your partner’s budget" : "\(household.inviterName) invited you")
-                            .font(.system(size: 32, weight: .heavy))
-                            .tracking(-0.5)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityAddTraits(.isHeader)
-                        Text(household.pendingInvite == nil
-                             ? "Open the invitation on this \(DeviceName.current) and you’ll both see and edit the same budget."
-                             : "Join to share one budget. You’ll both see every change, and each of you connects your own banks.")
-                            .font(.system(size: 16))
-                            .foregroundStyle(OnboardingStyle.secondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    if household.pendingInvite == nil {
-                        OnboardingCard {
-                            stepRow(1, "Ask for an invite", "In Suffice on their iPhone: Profile › Household › Invite to Household.")
-                            OnboardingDivider(inset: 62)
-                            stepRow(2, "Open the link here", "Tap the invitation they send you in Messages or Mail. Suffice opens right to it.")
-                            OnboardingDivider(inset: 62)
-                            stepRow(3, "Use the right Apple Account", "The one the invitation was sent to, signed in to iCloud on this \(DeviceName.current).")
-                        }
-                        HStack(spacing: 10) {
-                            ProgressView().tint(OnboardingStyle.tertiaryText)
-                            Text("Waiting for the invitation…")
-                                .font(.system(size: 14))
-                                .foregroundStyle(OnboardingStyle.tertiaryText)
-                        }
-                        .padding(.horizontal, 6)
-                    } else {
-                        if let error = household.joinError {
-                            Label("Couldn’t join yet: \(error)", systemImage: "exclamationmark.triangle.fill")
-                                .font(.system(size: 13))
-                                .foregroundStyle(Color(hex: 0xFF9F57))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Label("The starter budget on this \(DeviceName.current) is replaced by the shared one.", systemImage: "info.circle")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color(hex: 0xC9DAF5))
-                            .padding(14)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(hex: 0x7FB2FF).opacity(0.10), in: .rect(cornerRadius: 20, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color(hex: 0x7FB2FF).opacity(0.22)))
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .scrollBounceBehavior(.basedOnSize)
-
-            VStack(spacing: 10) {
-                if household.pendingInvite != nil {
-                    Button(household.joinError == nil ? "Join \(household.inviterName)’s Household" : "Try Again") {
-                        Task { await household.acceptInvite() }
-                    }
-                    .buttonStyle(.onboarding())
-                    .disabled(household.isWorking)
-                }
-                Button(household.pendingInvite == nil ? "Set Up My Own Budget Instead" : "Not Now") {
-                    household.pendingInvite = nil
-                    flow.go(to: .household)
-                }
-                .buttonStyle(.onboarding(.plain))
-            }
-            .padding(.bottom, 12)
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 20)
-        .frame(maxWidth: OnboardingStyle.columnWidth)
-        .frame(maxWidth: .infinity)
-        .background(Color.black.ignoresSafeArea())
-        .animation(.smooth, value: household.pendingInvite != nil)
-    }
-
-    private func stepRow(_ number: Int, _ title: String, _ detail: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Text("\(number)")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(OnboardingStyle.accent)
-                .frame(width: 32, height: 32)
-                .background(OnboardingStyle.accent.opacity(0.16), in: .circle)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 15, weight: .semibold))
-                Text(detail)
-                    .font(.system(size: 13))
-                    .foregroundStyle(OnboardingStyle.tertiaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .accessibilityElement(children: .combine)
     }
 }

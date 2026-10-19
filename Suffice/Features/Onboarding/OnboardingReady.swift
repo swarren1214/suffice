@@ -15,12 +15,14 @@ struct OnboardingReady: View {
     @Query private var accounts: [Account]
     @Query(sort: \LinkedBank.createdAt) private var banks: [LinkedBank]
     @AppStorage(SettingsKey.remindBills) private var remindBills = false
-    @State private var household = HouseholdSync.shared
+    @State private var family = HearthHouseholdStore.shared
     @State private var appeared = false
 
     init(finish: @escaping (_ tour: Bool) -> Void) {
         self.finish = finish
     }
+
+    private var myName: String { family.me?.firstName ?? "" }
 
     private var monthName: String { router.month.start.formatted(.dateTime.month(.wide)) }
 
@@ -45,13 +47,10 @@ struct OnboardingReady: View {
             }
             rows.append(("Accounts", value))
         }
-        if let partner = flow.partner {
-            let joined = household.participants.contains { $0.acceptanceStatus == .accepted }
-            if joined {
-                rows.append(("Shared with", partner))
-            } else if !household.participants.isEmpty {
-                rows.append(("Shared with", "\(partner) (invited)"))
-            }
+        // The budget is shared with the household's other parents and adults.
+        let others = family.parents.filter { $0.id != family.me?.id }.map(\.firstName).filter { !$0.isEmpty }
+        if !others.isEmpty {
+            rows.append(("Shared with", others.formatted(.list(type: .and))))
         }
         return rows
     }
@@ -75,7 +74,7 @@ struct OnboardingReady: View {
             .accessibilityHidden(true)
 
             VStack(spacing: 8) {
-                Text(flow.myName.isEmpty ? "You’re all set" : "You’re all set, \(flow.myName.trimmingCharacters(in: .whitespaces))")
+                Text(myName.isEmpty ? "You’re all set" : "You’re all set, \(myName)")
                     .font(.system(size: 34, weight: .heavy))
                     .tracking(-0.5)
                     .multilineTextAlignment(.center)
@@ -134,55 +133,8 @@ struct OnboardingReady: View {
         )
         .task {
             withAnimation(.spring(duration: 0.9, bounce: 0.3).delay(0.15)) { appeared = true }
-            await household.refreshShare()
+            await family.refreshShare()
         }
         .sensoryFeedback(.success, trigger: appeared)
-    }
-}
-
-/// After joining someone's household: which of its people is you, so your transactions get
-/// your badge. Shown once, from the tabs, as soon as the household's people have arrived.
-struct WhoAreYouSheet: View {
-    var members: [Member]
-    @Environment(\.dismiss) private var dismiss
-    @AppStorage(SettingsKey.currentMember) private var currentMember = ""
-    @State private var addingMe = false
-
-    init(members: [Member]) {
-        self.members = members
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(members) { member in
-                        Button {
-                            currentMember = member.id.uuidString
-                            dismiss()
-                        } label: {
-                            HStack(spacing: 12) {
-                                PersonAvatar(member: member, size: 40)
-                                Text(member.name).foregroundStyle(Color.primary)
-                            }
-                        }
-                    }
-                    Button("I’m Not Listed", systemImage: "person.badge.plus") { addingMe = true }
-                } footer: {
-                    Text("The transactions you add get your badge. Change it anytime in Profile › Household.")
-                }
-            }
-            .navigationTitle("Which one is you?")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Not Now") { dismiss() }
-                }
-            }
-            .sheet(isPresented: $addingMe, onDismiss: { if !currentMember.isEmpty { dismiss() } }) {
-                MemberEditor(member: nil, isMe: true)
-            }
-        }
-        .presentationDetents([.medium, .large])
     }
 }

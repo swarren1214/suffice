@@ -53,6 +53,12 @@ final class BudgetCategory {
     var repeatsMonthly: Bool = true
     var sortOrder: Int = 0
     var isArchived: Bool = false
+    /// Counts toward the emergency fund's essentials (Net Worth › Emergency fund). Nil until
+    /// someone picks: Home, Utilities, Auto and Groceries start out essential.
+    var isEssential: Bool?
+    /// The tax tag its transactions get when they have none of their own (Giving → charitable).
+    /// Empty for none.
+    var taxTagRaw: String = ""
     var createdAt: Date = Date.now
 
     init(name: String, symbol: String, color: CategoryColor, limitCents: Int, parentID: UUID? = nil, startMonth: Date = .distantPast, repeatsMonthly: Bool = true, sortOrder: Int = 0) {
@@ -71,8 +77,21 @@ final class BudgetCategory {
         set { colorRaw = newValue.rawValue }
     }
 
+    var taxTag: TaxTag {
+        get { TaxTag(rawValue: taxTagRaw) ?? .untagged }
+        set { taxTagRaw = newValue.rawValue }
+    }
+
+    /// Whether it counts as essential, with the starting choice for budgets nobody has picked.
+    var countsAsEssential: Bool { isEssential ?? BudgetCategory.essentialByDefault(name) }
+
+    /// The budgets a household would still pay with no income, until it says otherwise.
+    nonisolated static func essentialByDefault(_ name: String) -> Bool {
+        ["home", "utilities", "auto", "groceries"].contains(name.trimmingCharacters(in: .whitespaces).lowercased())
+    }
+
     var record: CategoryRecord {
-        CategoryRecord(id: id, name: name, limitCents: limitCents, parentID: parentID, startMonth: startMonth, repeatsMonthly: repeatsMonthly, isArchived: isArchived, sortOrder: sortOrder)
+        CategoryRecord(id: id, name: name, limitCents: limitCents, parentID: parentID, startMonth: startMonth, repeatsMonthly: repeatsMonthly, isArchived: isArchived, sortOrder: sortOrder, isEssential: countsAsEssential, taxTag: taxTag)
     }
 }
 
@@ -82,6 +101,82 @@ nonisolated enum EntryKind: String, CaseIterable, Identifiable, Codable, Sendabl
 
     var id: String { rawValue }
     var name: String { self == .expense ? "Expense" : "Income" }
+}
+
+/// What a transaction might matter for at tax time. Tags never change budgets; they collect
+/// spending for Profile › Tax Year and the export for a tax preparer. Stored as its raw value,
+/// empty for untagged.
+nonisolated enum TaxTag: String, CaseIterable, Identifiable, Codable, Sendable {
+    case untagged = ""
+    case charitable, medical, hsa, childcare, education, business
+
+    var id: String { rawValue }
+
+    var isTagged: Bool { self != .untagged }
+
+    /// Its name in a spreadsheet: empty when untagged.
+    var exportName: String { isTagged ? name : "" }
+
+    var name: String {
+        switch self {
+        case .untagged: "None"
+        case .charitable: "Charitable giving"
+        case .medical: "Medical"
+        case .hsa: "HSA or FSA eligible"
+        case .childcare: "Childcare"
+        case .education: "Education"
+        case .business: "Business"
+        }
+    }
+
+    /// The pill's word: "Charitable", "HSA eligible".
+    var shortName: String {
+        switch self {
+        case .untagged: "None"
+        case .charitable: "Charitable"
+        case .hsa: "HSA eligible"
+        default: name
+        }
+    }
+
+    var hint: String {
+        switch self {
+        case .untagged: "Not for taxes"
+        case .charitable: "Donations to qualified charities"
+        case .medical: "Doctors, prescriptions, dental, vision"
+        case .hsa: "To reimburse from a health account"
+        case .childcare: "Daycare, after-school care, day camps"
+        case .education: "Tuition, books, 529 expenses"
+        case .business: "Side business or work expenses"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .untagged: "minus"
+        case .charitable: "heart.fill"
+        case .medical: "cross.case.fill"
+        case .hsa: "heart.text.square.fill"
+        case .childcare: "figure.and.child.holdinghands"
+        case .education: "graduationcap.fill"
+        case .business: "briefcase.fill"
+        }
+    }
+
+    var color: CategoryColor {
+        switch self {
+        case .untagged: .gray
+        case .charitable: .yellow
+        case .medical: .green
+        case .hsa: .teal
+        case .childcare: .pink
+        case .education: .purple
+        case .business: .blue
+        }
+    }
+
+    /// Every tag but untagged, in the order they're listed.
+    static var tags: [TaxTag] { allCases.filter(\.isTagged) }
 }
 
 /// One transaction. `amountCents` is always positive; `kind` says which way it went.
@@ -124,6 +219,19 @@ final class LedgerEntry {
     /// A photo of the receipt (a JPEG, scanned or picked in the transaction sheet). Stored
     /// outside the database file; household sync carries it as an asset.
     @Attribute(.externalStorage) var receiptData: Data?
+    /// Where the receipt came from: "email" for one found in a connected mailbox, empty for a
+    /// photo or scan. With it, a link that opens the email.
+    var receiptSourceRaw: String = ""
+    var receiptLink: String = ""
+    /// One charge split across budgets: its parts as JSON (see `splits`), or empty when it isn't
+    /// split. Kept as text on the transaction so a split syncs, and is deleted, with it.
+    var splitsJSON: String = ""
+    /// A bill payment (or any spending) paid from a stash, and how much of it the stash covered.
+    /// That much doesn't count against the month's budget: it was planned month by month.
+    var stashID: UUID?
+    var stashCents: Int = 0
+    /// Its tax tag (see TaxTag), stamped when it's saved or arrives from the bank. Empty for none.
+    var taxTagRaw: String = ""
     var createdAt: Date = Date.now
 
     init(
@@ -159,12 +267,42 @@ final class LedgerEntry {
     var signedCents: Int { kind == .income ? amountCents : -amountCents }
 
     /// Needs a look: arrived on its own, or spending with no category yet.
-    var needsReview: Bool { !isReviewed || (kind == .expense && categoryID == nil) }
+    var needsReview: Bool { !isReviewed || (kind == .expense && categoryID == nil && !isSplit) }
+
+    /// The parts of a split charge, each with its own budget; empty when it isn't split. A split
+    /// always has two or more parts adding up to `amountCents`, and `categoryID` is its biggest
+    /// part's, so anything that reads one category still gets a sensible one.
+    var splits: [EntrySplit] {
+        get {
+            guard !splitsJSON.isEmpty, let data = splitsJSON.data(using: .utf8) else { return [] }
+            return (try? JSONDecoder().decode([EntrySplit].self, from: data)) ?? []
+        }
+        set {
+            guard newValue.count > 1, let data = try? JSONEncoder().encode(newValue) else {
+                splitsJSON = ""
+                return
+            }
+            splitsJSON = String(decoding: data, as: UTF8.self)
+        }
+    }
+
+    var isSplit: Bool { !splitsJSON.isEmpty }
+
+    var taxTag: TaxTag {
+        get { TaxTag(rawValue: taxTagRaw) ?? .untagged }
+        set { taxTagRaw = newValue.rawValue }
+    }
 
     /// A plain snapshot for BudgetMath, tests and export.
     var record: EntryRecord {
-        EntryRecord(id: id, date: date, payee: payee, amountCents: amountCents, kind: kind, categoryID: categoryID, memberID: memberID, accountID: accountID, billID: billID, billDueDate: billDueDate)
+        EntryRecord(id: id, date: date, payee: payee, amountCents: amountCents, kind: kind, categoryID: categoryID, memberID: memberID, accountID: accountID, billID: billID, billDueDate: billDueDate, splits: splits, stashID: stashID, stashCents: stashCents, taxTag: taxTag)
     }
+
+    /// What of this charge counts toward any of `ids`: all of it, or its parts filed there.
+    func cents(in ids: Set<UUID>) -> Int { record.cents(in: ids) }
+
+    /// Whether any of it is filed to one of `ids`.
+    func touches(_ ids: Set<UUID>) -> Bool { record.parts.contains { $0.categoryID.map(ids.contains) == true } }
 }
 
 /// How often a bill comes due.
@@ -218,6 +356,8 @@ final class Bill {
     var isSubscription: Bool = false
     var isActive: Bool = true
     var note: String = ""
+    /// Where it's paid ("https://www.xpressbillpay.com"): Pay opens it. Empty for none.
+    var payURL: String = ""
     var createdAt: Date = Date.now
 
     init(name: String, amountCents: Int, dueDay: Int, color: CategoryColor = .blue, categoryID: UUID? = nil, isAutopay: Bool = false, isSubscription: Bool = false) {
@@ -236,6 +376,23 @@ final class Bill {
     }
 
     var initial: String { name.first.map { String($0).uppercased() } ?? "?" }
+
+    /// Where Pay goes, when it's a web address (a bare "xpressbillpay.com" gets https).
+    var payLink: URL? { Bill.payLink(from: payURL) }
+
+    /// A typed Pay at address as a web address, or nil when it isn't one.
+    nonisolated static func payLink(from text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let address = trimmed.contains("://") ? trimmed : "https://" + trimmed
+        guard let url = URL(string: address), let scheme = url.scheme?.lowercased(), ["https", "http"].contains(scheme), url.host != nil else { return nil }
+        return url
+    }
+
+    /// "xpressbillpay.com" for the Pay button.
+    var payHost: String? {
+        payLink?.host()?.replacingOccurrences(of: "www.", with: "")
+    }
 
     /// "$151.00", or "~$151.00" for a variable bill.
     var amountLabel: String {
@@ -311,6 +468,8 @@ final class Account {
     /// For bank-synced accounts: the connected bank (LinkedBank.itemID) and Plaid's account ID.
     var plaidItemID: String?
     var plaidAccountID: String?
+    /// Counts toward the emergency fund. Nil until someone picks: savings accounts count.
+    var isEmergencyFund: Bool?
     var sortOrder: Int = 0
     var createdAt: Date = Date.now
 
@@ -334,6 +493,9 @@ final class Account {
 
     /// "Chase Checking"
     var displayName: String { institution.isEmpty ? name : "\(institution) \(name)" }
+
+    /// Whether its balance counts toward the emergency fund, with savings on until someone picks.
+    var countsTowardEmergencyFund: Bool { isEmergencyFund ?? (kind == .savings) }
 
     var record: AccountRecord {
         AccountRecord(id: id, kind: kind, balanceCents: balanceCents, balanceDate: balanceDate, includeInBudget: includeInBudget, isManual: source == .manual)
@@ -366,20 +528,33 @@ final class LinkedBank {
     }
 }
 
-/// "Always use this category for Chick-fil-A". New transactions from the payee get it.
+/// "Always use this category for Chick-fil-A", "Always tag Walgreens as HSA eligible". New
+/// transactions from the payee get them.
 @Model
 final class PayeeRule {
     /// Kept in history after deletion, so household sync can tell iCloud which record went.
     @Attribute(.preserveValueOnDeletion) var id: UUID = UUID()
     /// Lowercased payee name.
     var payeeKey: String = ""
+    /// The category, or nil for a rule that only tags.
     var categoryID: UUID?
+    /// "Always tag Intermountain Health as Medical": the tax tag, empty for none.
+    var taxTagRaw: String = ""
     var createdAt: Date = Date.now
 
-    init(payee: String, categoryID: UUID?) {
+    init(payee: String, categoryID: UUID?, taxTag: TaxTag = .untagged) {
         self.payeeKey = PayeeRule.key(for: payee)
         self.categoryID = categoryID
+        self.taxTagRaw = taxTag.rawValue
     }
+
+    var taxTag: TaxTag {
+        get { TaxTag(rawValue: taxTagRaw) ?? .untagged }
+        set { taxTagRaw = newValue.rawValue }
+    }
+
+    /// Neither a category nor a tag: nothing left for it to do.
+    var isEmpty: Bool { categoryID == nil && !taxTag.isTagged }
 
     nonisolated static func key(for payee: String) -> String {
         payee.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -400,8 +575,60 @@ nonisolated struct EntryRecord: Hashable, Sendable {
     var accountID: UUID?
     var billID: UUID?
     var billDueDate: Date?
+    /// A split charge's parts; empty when it isn't split.
+    var splits: [EntrySplit] = []
+    /// The stash that paid for it, and how much the stash covered.
+    var stashID: UUID?
+    var stashCents: Int = 0
+    var taxTag: TaxTag = .untagged
 
     var signedCents: Int { kind == .income ? amountCents : -amountCents }
+
+    /// Where the money went: the parts of a split, or the whole charge in its one category.
+    var parts: [EntrySplit] {
+        splits.isEmpty ? [EntrySplit(categoryID: categoryID, amountCents: amountCents)] : splits
+    }
+
+    /// What of it counts as this month's spending: its parts, less what a stash covered (taken
+    /// off the part in its main category first, then the others). A bill paid in full from a
+    /// stash leaves nothing.
+    var spendingParts: [EntrySplit] {
+        let covered = min(max(stashCents, 0), amountCents)
+        guard covered > 0 else { return parts }
+        var result = parts
+        var left = covered
+        let main = categoryID
+        func rank(_ index: Int) -> Int { result[index].categoryID == main ? 0 : 1 }
+        let order = result.indices.sorted { (rank($0), $0) < (rank($1), $1) }
+        for index in order where left > 0 {
+            let taken = min(result[index].amountCents, left)
+            result[index].amountCents -= taken
+            left -= taken
+        }
+        return result.filter { $0.amountCents > 0 }
+    }
+
+    /// What counts as spending toward any of `ids`, after what a stash covered.
+    func spendingCents(in ids: Set<UUID>) -> Int {
+        spendingParts.filter { $0.categoryID.map(ids.contains) == true }.reduce(0) { $0 + $1.amountCents }
+    }
+
+    /// What it counts as this month's spending, in all.
+    var spendingCents: Int { amountCents - min(max(stashCents, 0), amountCents) }
+
+    /// What counts toward any of `ids`.
+    func cents(in ids: Set<UUID>) -> Int {
+        parts.filter { $0.categoryID.map(ids.contains) == true }.reduce(0) { $0 + $1.amountCents }
+    }
+}
+
+/// One part of a split charge: how much of it goes to which budget or subcategory.
+nonisolated struct EntrySplit: Hashable, Codable, Sendable, Identifiable {
+    var id: UUID = UUID()
+    var categoryID: UUID?
+    var amountCents: Int
+    /// This part's own tax tag; nil goes by the charge's. Older parts decode without one.
+    var taxTag: TaxTag?
 }
 
 nonisolated struct CategoryRecord: Hashable, Sendable {
@@ -413,6 +640,9 @@ nonisolated struct CategoryRecord: Hashable, Sendable {
     var repeatsMonthly: Bool = true
     var isArchived: Bool = false
     var sortOrder: Int = 0
+    /// Counts toward emergency fund essentials (already resolved from its default).
+    var isEssential: Bool = false
+    var taxTag: TaxTag = .untagged
 }
 
 nonisolated struct BillRecord: Hashable, Sendable {

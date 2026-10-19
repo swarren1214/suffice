@@ -122,7 +122,8 @@ nonisolated struct BudgetLeftIntent: AppIntent {
 
         // Every budget together.
         let planned = data.statuses(in: month).filter { $0.limitCents > 0 }
-        let left = planned.reduce(0) { $0 + $1.leftCents }
+        // This month's stash amounts are planned too, so they come out of what's left.
+        let left = planned.reduce(0) { $0 + $1.leftCents } - data.stashed(in: month)
         let over = planned.filter(\.isOver).map(\.category.name)
         var dialog = left >= 0
             ? "You have \(Money.text(left)) left to spend this month, \(togo)."

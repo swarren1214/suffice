@@ -52,6 +52,7 @@ struct SearchView: View {
                 entry.note,
                 lookup.category(entry.categoryID)?.name ?? "",
                 lookup.budget(for: entry.categoryID)?.name ?? "",
+                entry.isSplit ? SplitLabel.text(entry.splits, lookup: lookup) : "",
                 lookup.member(entry.memberID)?.name ?? "",
                 lookup.account(entry.accountID)?.displayName ?? "",
                 Money.text(entry.amountCents),

@@ -16,6 +16,7 @@ struct BudgetSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.openURL) private var openURL
     @Query(sort: \BudgetCategory.sortOrder) private var categories: [BudgetCategory]
     @Query(sort: \Member.sortOrder) private var members: [Member]
     @Query(sort: \Account.sortOrder) private var accounts: [Account]
@@ -48,6 +49,11 @@ struct BudgetSheet: View {
     @State private var expandedGroups: Set<UUID> = []
     /// The Icon & Color picker is open.
     @State private var pickingLook = false
+    /// The tax tag its transactions get when they have none of their own.
+    @State private var taxTag: TaxTag = .untagged
+    @State private var tagsEarlier = false
+    @State private var earlierCount = 0
+    @State private var asksAboutEarlier = false
 
     enum Recurrence: String, CaseIterable, Identifiable {
         case monthly, once
@@ -94,11 +100,12 @@ struct BudgetSheet: View {
         return all.flatMap(\.children).first { $0.id == category.id }
     }
 
-    /// Transactions filed to the budget or any of its subcategories.
+    /// Transactions filed to the budget or any of its subcategories, split charges with a part
+    /// here included.
     private var budgetEntries: [LedgerEntry] {
         guard let category else { return [] }
         let ids = Set([category.id] + children.map(\.id))
-        return entries.filter { $0.kind == .expense && $0.categoryID.map(ids.contains) == true }
+        return entries.filter { $0.kind == .expense && $0.touches(ids) }
     }
 
     var body: some View {
@@ -110,6 +117,7 @@ struct BudgetSheet: View {
                     header
 
                     if !isEditing {
+                        bigTableGroceries
                         transactionsView(lookup: lookup)
                     } else {
                         editingView
@@ -147,6 +155,12 @@ struct BudgetSheet: View {
                         .disabled(!isValid)
                 }
             }
+            .alert("Tag \(earlierCount) earlier transaction\(earlierCount == 1 ? "" : "s") from this year too?", isPresented: $asksAboutEarlier) {
+                Button("Tag Them") { tagsEarlier = true }
+                Button("Not Now", role: .cancel) { tagsEarlier = false }
+            } message: {
+                Text("This year’s \(name) transactions with no tag would be tagged \(taxTag.name).")
+            }
             .alert("Delete \(name)?", isPresented: $confirmsDelete) {
                 Button(isSubcategory ? "Delete Subcategory" : "Delete Budget", role: .destructive) {
                     pendingDelete = true
@@ -172,6 +186,7 @@ struct BudgetSheet: View {
                     let id: UUID? = category.id
                     let filed = (try? context.fetch(FetchDescriptor<LedgerEntry>(predicate: #Predicate { $0.categoryID == id }))) ?? []
                     for entry in filed { entry.categoryID = parentID }
+                    Ledger.moveSplitParts(from: category.id, to: parentID, in: context)
                 }
                 context.delete(category)
                 try? context.save()
@@ -188,6 +203,8 @@ struct BudgetSheet: View {
                     amountRow
                     Divider().padding(.leading, 16)
                     iconColorRow
+                    Divider().padding(.leading, 16)
+                    taxTagRow
                 }
             }
         } else {
@@ -217,6 +234,8 @@ struct BudgetSheet: View {
                     }
                     Divider().padding(.leading, 16)
                     iconColorRow
+                    Divider().padding(.leading, 16)
+                    taxTagRow
                 }
             }
         }
@@ -252,10 +271,10 @@ struct BudgetSheet: View {
             EmptyCard(systemName: "tray", title: "No transactions", message: "Nothing is filed to \(name) in \(DateLabel.month(month.start)) yet.")
         } else if children.isEmpty {
             group(title, note: "\(count) transaction\(count == 1 ? "" : "s")") {
-                entryList(budgetEntries, lookup: lookup)
+                entryList(budgetEntries, lookup: lookup, ids: Set([category?.id].compactMap { $0 }))
             }
         } else if let category {
-            let direct = budgetEntries.filter { $0.categoryID == category.id }
+            let direct = budgetEntries.filter { $0.touches([category.id]) }
             let subs = children.sorted { ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name) }
             group(title, note: "\(count) transaction\(count == 1 ? "" : "s")") {
                 VStack(spacing: 0) {
@@ -265,7 +284,7 @@ struct BudgetSheet: View {
                         groupRow(
                             id: child.id, symbol: child.symbol, title: child.name, detail: nil,
                             limitCents: child.limitCents,
-                            entries: budgetEntries.filter { $0.categoryID == child.id },
+                            entries: budgetEntries.filter { $0.touches([child.id]) },
                             lookup: lookup
                         )
                     }
@@ -278,7 +297,8 @@ struct BudgetSheet: View {
     @ViewBuilder
     private func groupRow(id: UUID, symbol: String, title: String, detail: String?, limitCents: Int?, entries: [LedgerEntry], lookup: Lookup) -> some View {
         let isOpen = expandedGroups.contains(id) && !entries.isEmpty
-        let spent = entries.reduce(0) { $0 + $1.amountCents }
+        // A split charge counts only its part here, and what a stash covered doesn't count.
+        let spent = entries.reduce(0) { $0 + $1.record.spendingCents(in: [id]) }
         let spentLine = limitCents.map { $0 > 0 ? "\(Money.text(spent)) of \(Money.text($0))" : "\(Money.text(spent)) spent" } ?? "\(Money.text(spent)) spent"
         let countLine = entries.isEmpty ? "Nothing yet" : "\(entries.count) transaction\(entries.count == 1 ? "" : "s")"
         VStack(spacing: 0) {
@@ -321,17 +341,18 @@ struct BudgetSheet: View {
 
             if isOpen {
                 Divider().padding(.leading, 60)
-                entryList(entries, lookup: lookup)
+                entryList(entries, lookup: lookup, ids: [id])
             }
         }
     }
 
-    private func entryList(_ list: [LedgerEntry], lookup: Lookup) -> some View {
+    /// The transactions, each showing what of it counts toward `ids` (all of it, unless split).
+    private func entryList(_ list: [LedgerEntry], lookup: Lookup, ids: Set<UUID>) -> some View {
         VStack(spacing: 0) {
             ForEach(Array(list.enumerated()), id: \.element.id) { index, entry in
                 if index > 0 { Divider().padding(.leading, 68) }
                 Button { openedEntry = entry } label: {
-                    TransactionRow(entry: entry, lookup: lookup)
+                    TransactionRow(entry: entry, lookup: lookup, partCents: entry.isSplit ? entry.cents(in: ids) : nil)
                 }
                 .buttonStyle(.plain)
                 .tint(.primary)
@@ -397,6 +418,48 @@ struct BudgetSheet: View {
         .padding(.top, 4)
     }
 
+    /// BigTable's grocery list as planned spending, on a groceries budget this month: what's
+    /// left to buy should cost, and whether that fits in what's left. Never a transaction.
+    @ViewBuilder
+    private var bigTableGroceries: some View {
+        if let status, month == MonthSpan(containing: .now), BigTableGroceries.isGroceries(name),
+           let list = BigTableGroceries.currentList(), let toBuy = BigTableGroceries.remainingCents(list) {
+            let after = status.leftCents - toBuy
+            Button {
+                if let url = BigTableGroceries.link { openURL(url) }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "cart.fill")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color(red: 0.88, green: 0.31, blue: 0.23), in: .rect(cornerRadius: 11))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("About \(Money.text(toBuy)) on BigTable's list")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("\(list.remainingCount) of \(list.itemCount) items left · "
+                             + (after >= 0 ? "leaves \(Money.text(after))" : "\(Money.text(-after)) more than what's left"))
+                            .font(.footnote)
+                            .foregroundStyle(after >= 0 ? Brand.secondaryText : Brand.expenseInk)
+                            .monospacedDigit()
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the list in BigTable")
+        }
+    }
+
     private func summaryLine(_ status: CategoryStatus) -> String {
         var line = status.limitCents > 0
             ? "\(Money.text(status.spentCents)) spent of \(Money.text(status.limitCents))"
@@ -426,6 +489,43 @@ struct BudgetSheet: View {
             icon: $symbol,
             color: $color.hearthChoice
         )
+    }
+
+    /// Tax Tag: "Giving → Charitable giving". Its transactions get the tag when they have none of
+    /// their own (a subcategory without one goes by its budget's).
+    private var taxTagRow: some View {
+        ChoicePopoverButton(sections: [TaxTag.allCases.map { tag in
+            ChoiceItem(id: tag.rawValue.isEmpty ? "none" : tag.rawValue, title: tag.name, systemImage: tag.symbol, isSelected: tag == taxTag) {
+                pickTaxTag(tag)
+            }
+        }]) {
+            HStack(spacing: 12) {
+                TaxTagIcon(tag: taxTag, size: 32)
+                Text("Tax Tag").foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                Text(taxTag.isTagged ? taxTag.name : (isSubcategory && parent?.taxTag.isTagged == true ? "Same as \(parent?.name ?? "budget")" : "None"))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 54)
+        .accessibilityLabel("Tax tag")
+        .accessibilityValue(taxTag.name)
+    }
+
+    /// A new tag offers to tag this year's untagged transactions too.
+    private func pickTaxTag(_ tag: TaxTag) {
+        taxTag = tag
+        tagsEarlier = false
+        guard tag.isTagged, let category else { return }
+        earlierCount = Ledger.untaggedThisYear(in: Set([category.id] + children.map(\.id)), context: context).count
+        if earlierCount > 0 { asksAboutEarlier = true }
     }
 
     private var amountRow: some View {
@@ -713,6 +813,7 @@ struct BudgetSheet: View {
         }
         name = category.name
         symbol = category.symbol
+        taxTag = category.taxTag
         color = parent?.color ?? category.color
         // The budget's own transactions start open.
         expandedGroups = [category.id]
@@ -742,6 +843,12 @@ struct BudgetSheet: View {
         let oldSymbol = category?.symbol
         target.name = name.trimmingCharacters(in: .whitespaces)
         target.symbol = symbol
+        target.taxTag = taxTag
+        if tagsEarlier, taxTag.isTagged {
+            for entry in Ledger.untaggedThisYear(in: Set([target.id] + children.map(\.id)), context: context) {
+                entry.taxTag = taxTag
+            }
+        }
 
         if let parent {
             // A subcategory: its own name, amount and icon; the rest is its budget's. A color
@@ -804,6 +911,7 @@ struct BudgetSheet: View {
             let childID: UUID? = id
             let filed = (try? context.fetch(FetchDescriptor<LedgerEntry>(predicate: #Predicate { $0.categoryID == childID }))) ?? []
             for entry in filed { entry.categoryID = budget.id }
+            Ledger.moveSplitParts(from: id, to: budget.id, in: context)
             context.delete(child)
         }
         for (index, draft) in subDrafts.enumerated() {

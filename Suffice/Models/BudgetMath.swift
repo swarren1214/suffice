@@ -54,9 +54,11 @@ nonisolated struct MonthTotals: Hashable, Sendable {
     var budgetedCents: Int
     /// Spending with no category (or a deleted one).
     var uncategorizedCents: Int
+    /// Counted toward stashes this month. It's part of the plan, so it comes out of what's left.
+    var stashedCents: Int = 0
 
-    /// Planned minus spent. Negative when the month has gone over plan.
-    var leftCents: Int { budgetedCents - spentCents }
+    /// Planned, less what went to stashes, less spent. Negative when the month has gone over plan.
+    var leftCents: Int { budgetedCents - stashedCents - spentCents }
 }
 
 /// Where a bill stands for a month.
@@ -100,10 +102,14 @@ nonisolated enum BudgetMath {
     }
 
     /// Spending per category ID for entries in `month`. Income is ignored. Nil key = uncategorized.
+    /// What a stash paid for doesn't count: it was planned, month by month, before it came.
     static func spentByCategory(_ entries: [EntryRecord], in month: MonthSpan) -> [UUID?: Int] {
         var totals: [UUID?: Int] = [:]
         for entry in entries where entry.kind == .expense && month.contains(entry.date) {
-            totals[entry.categoryID, default: 0] += entry.amountCents
+            // A split charge counts each part toward its own budget.
+            for part in entry.spendingParts {
+                totals[part.categoryID, default: 0] += part.amountCents
+            }
         }
         return totals
     }
@@ -135,17 +141,20 @@ nonisolated enum BudgetMath {
         }
     }
 
-    static func totals(_ categories: [CategoryRecord], entries: [EntryRecord], in month: MonthSpan, calendar: Calendar = .current) -> MonthTotals {
+    /// The month's totals. `stashMoves` are the stash amounts counted (any month; only this
+    /// month's count).
+    static func totals(_ categories: [CategoryRecord], entries: [EntryRecord], in month: MonthSpan, stashMoves: [StashMoveRecord] = [], calendar: Calendar = .current) -> MonthTotals {
         let inMonth = entries.filter { month.contains($0.date) }
         let known = Set(categories.map(\.id))
         let income = inMonth.filter { $0.kind == .income }.reduce(0) { $0 + $1.amountCents }
         let expenses = inMonth.filter { $0.kind == .expense }
-        let spent = expenses.reduce(0) { $0 + $1.amountCents }
+        let spent = expenses.reduce(0) { $0 + $1.spendingCents }
         let uncategorized = expenses
-            .filter { entry in entry.categoryID.map { !known.contains($0) } ?? true }
+            .flatMap(\.spendingParts)
+            .filter { part in part.categoryID.map { !known.contains($0) } ?? true }
             .reduce(0) { $0 + $1.amountCents }
         let budgeted = statuses(categories, entries: entries, in: month, calendar: calendar).reduce(0) { $0 + $1.limitCents }
-        return MonthTotals(incomeCents: income, spentCents: spent, budgetedCents: budgeted, uncategorizedCents: uncategorized)
+        return MonthTotals(incomeCents: income, spentCents: spent, budgetedCents: budgeted, uncategorizedCents: uncategorized, stashedCents: StashMath.stashed(stashMoves, in: month))
     }
 
     /// An account's balance now. Manual accounts move with every transaction filed to them

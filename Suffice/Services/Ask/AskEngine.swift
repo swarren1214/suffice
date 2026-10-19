@@ -105,6 +105,38 @@ nonisolated struct AffordTool: Tool {
     }
 }
 
+nonisolated struct StashesTool: Tool {
+    let name = "getStashes"
+    let description = "Gets the stashes: money saved month by month for bills that come once or twice a year (insurance, Christmas), with what's stashed, the monthly amount and whether each is on track."
+    let data: AskData
+
+    @Generable
+    nonisolated struct Arguments {
+        @Guide(description: "A stash's name, like \"Christmas\", or empty for every stash")
+        var name: String
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        await data.stashesText(named: arguments.name)
+    }
+}
+
+nonisolated struct RunwayTool: Tool {
+    let name = "getRunway"
+    let description = "Gets the emergency fund: how many months of essentials savings would cover if income stopped, the goal, and the gap."
+    let data: AskData
+
+    @Generable
+    nonisolated struct Arguments {
+        @Guide(description: "Leave empty")
+        var note: String
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        await data.runwayText()
+    }
+}
+
 // MARK: - Replies
 
 @Generable
@@ -179,7 +211,7 @@ final class AskEngine {
 
         Rules:
         - Get every number from a tool first. Never guess an amount.
-        - getBudget for one budget, getBudgets for all, getBills for bills, getSpending for where money went, findTransactions for a store or payee, checkAffordability for "can we afford".
+        - getBudget for one budget, getBudgets for all, getBills for bills, getSpending for where money went, findTransactions for a store or payee, checkAffordability for "can we afford", getStashes for saving toward yearly bills ("are we saving enough for Christmas?"), getRunway for "how long could we last?".
         - To move money between budgets, check getBudgets, then fill moveFrom, moveTo and moveDollars. Don't say it's done; they confirm it.
         - No investment, tax, legal or credit advice. Only talk about their money in Suffice.
         """
@@ -198,6 +230,7 @@ final class AskEngine {
             tools: [
                 BudgetsTool(data: data), BudgetTool(data: data), BillsTool(data: data),
                 SpendingTool(data: data), TransactionsTool(data: data), AffordTool(data: data),
+                StashesTool(data: data), RunwayTool(data: data),
             ],
             instructions: Self.instructions
         )

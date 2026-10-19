@@ -19,6 +19,7 @@ enum SyncCleanup {
         mergeAccounts(in: context, entries: entries)
         mergeRules(in: context)
         mergeBankEntries(entries, in: context)
+        mergeStashMoves(in: context)
         if context.hasChanges {
             do {
                 try context.save()
@@ -41,6 +42,8 @@ enum SyncCleanup {
             let keeper = oldest(group, created: \.createdAt, id: \.id)
             for extra in sortedOldestFirst(group, created: \.createdAt, id: \.id) where extra.id != keeper.id {
                 if keeper.limitCents == 0 { keeper.limitCents = extra.limitCents }
+                if keeper.isEssential == nil { keeper.isEssential = extra.isEssential }
+                if !keeper.taxTag.isTagged { keeper.taxTagRaw = extra.taxTagRaw }
                 replaced[extra.id] = keeper.id
                 context.delete(extra)
             }
@@ -62,6 +65,15 @@ enum SyncCleanup {
 
         for entry in entries {
             if let id = entry.categoryID, let kept = replaced[id] { entry.categoryID = kept }
+            if entry.isSplit {
+                let parts = entry.splits
+                let moved = parts.map { part in
+                    var part = part
+                    if let id = part.categoryID, let kept = replaced[id] { part.categoryID = kept }
+                    return part
+                }
+                if moved != parts { entry.splits = moved }
+            }
         }
         for bill in fetch(Bill.self, in: context) {
             if let id = bill.categoryID, let kept = replaced[id] { bill.categoryID = kept }
@@ -107,14 +119,20 @@ enum SyncCleanup {
         for entry in entries {
             if let id = entry.accountID, let kept = replaced[id] { entry.accountID = kept }
         }
+        for stash in fetch(Stash.self, in: context) {
+            if let id = stash.accountID, let kept = replaced[id] { stash.accountID = kept }
+        }
     }
 
-    /// One rule per payee: the newest choice wins.
+    /// One rule per payee: the newest choice wins, keeping a category or tag only another has.
     private static func mergeRules(in context: ModelContext) {
         let rules = fetch(PayeeRule.self, in: context)
         for group in Dictionary(grouping: rules, by: \.payeeKey).values where group.count > 1 {
-            let newest = sortedOldestFirst(group, created: \.createdAt, id: \.id).last
-            for extra in group where extra.id != newest?.id {
+            let sorted = sortedOldestFirst(group, created: \.createdAt, id: \.id)
+            guard let newest = sorted.last else { continue }
+            for extra in sorted.reversed() where extra.id != newest.id {
+                if newest.categoryID == nil { newest.categoryID = extra.categoryID }
+                if !newest.taxTag.isTagged { newest.taxTagRaw = extra.taxTagRaw }
                 context.delete(extra)
             }
         }
@@ -128,13 +146,35 @@ enum SyncCleanup {
             let keeper = oldest(group, created: \.createdAt, id: \.id)
             for extra in sortedOldestFirst(group, created: \.createdAt, id: \.id) where extra.id != keeper.id {
                 if keeper.categoryID == nil { keeper.categoryID = extra.categoryID }
+                if !keeper.isSplit && extra.isSplit { keeper.splitsJSON = extra.splitsJSON }
                 if keeper.memberID == nil { keeper.memberID = extra.memberID }
                 if keeper.billID == nil {
                     keeper.billID = extra.billID
                     keeper.billDueDate = extra.billDueDate
                 }
                 if keeper.note.isEmpty { keeper.note = extra.note }
+                if keeper.stashID == nil, extra.stashID != nil {
+                    keeper.stashID = extra.stashID
+                    keeper.stashCents = extra.stashCents
+                }
+                if !keeper.taxTag.isTagged { keeper.taxTagRaw = extra.taxTagRaw }
                 keeper.isReviewed = keeper.isReviewed || extra.isReviewed
+                context.delete(extra)
+            }
+        }
+    }
+
+    /// The same month of a stash counted twice (two devices each counted the 1st before they
+    /// synced): keep the oldest, so every device keeps the same one.
+    private static func mergeStashMoves(in context: ModelContext) {
+        let moves = fetch(StashMove.self, in: context)
+        guard moves.count > 1 else { return }
+        let byID = Dictionary(moves.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for group in StashMath.duplicateGroups(moves.map(\.record)) {
+            let models = group.compactMap { byID[$0.id] }
+            guard models.count > 1 else { continue }
+            let keeper = oldest(models, created: \.createdAt, id: \.id)
+            for extra in models where extra.id != keeper.id {
                 context.delete(extra)
             }
         }

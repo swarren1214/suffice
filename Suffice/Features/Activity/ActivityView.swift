@@ -192,6 +192,8 @@ private struct CountBadge: View {
 struct TransactionRow: View {
     var entry: LedgerEntry
     var lookup: Lookup
+    /// In a budget's list, the part of a split charge that counts there.
+    var partCents: Int? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -207,7 +209,7 @@ struct TransactionRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            AmountPill(cents: entry.amountCents, kind: entry.kind)
+            AmountPill(cents: partCents ?? entry.amountCents, kind: entry.kind)
         }
         .padding(.leading, 16)
         .padding(.trailing, 14)
@@ -218,6 +220,15 @@ struct TransactionRow: View {
 
     private var meta: String {
         var parts = [entry.date.formatted(.dateTime.month(.abbreviated).day())]
+        if entry.isSplit, entry.kind == .expense {
+            // "Part of a $214.37 split" in a budget; "Split · Food, Home" everywhere else.
+            if partCents != nil {
+                parts.append("Part of a \(Money.text(entry.amountCents)) split")
+            } else {
+                parts.append(SplitLabel.text(entry.splits, lookup: lookup))
+            }
+            return parts.joined(separator: " · ")
+        }
         if let account = lookup.account(entry.accountID) {
             parts.append(account.displayName)
         } else if entry.kind == .expense, entry.categoryID == nil {
@@ -226,6 +237,18 @@ struct TransactionRow: View {
             parts.append(category.name)
         }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// "Split · Food, Home, Entertainment": a split charge's budgets, biggest part first.
+enum SplitLabel {
+    static func text(_ parts: [EntrySplit], lookup: Lookup) -> String {
+        var names: [String] = []
+        for part in parts.sorted(by: { $0.amountCents > $1.amountCents }) {
+            let name = lookup.budget(for: part.categoryID)?.name ?? "Uncategorized"
+            if !names.contains(name) { names.append(name) }
+        }
+        return "Split · " + names.joined(separator: ", ")
     }
 }
 

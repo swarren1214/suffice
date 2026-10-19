@@ -2,7 +2,7 @@ import CloudKit
 import Foundation
 import SwiftData
 
-/// A model that household sync carries to CloudKit, one record per model. Records are named
+/// A model that budget sync carries to CloudKit (the Hearth container's "Budget" zone), one record per model. Records are named
 /// "<Type>.<uuid>" so a record ID alone says what it is. Every field goes in `encryptedValues`
 /// (end-to-end encrypted with the iCloud account's keys); a member's photo is an asset, which
 /// CloudKit encrypts on its own.
@@ -21,10 +21,18 @@ protocol SyncedModel: PersistentModel {
 enum SyncRegistry {
     static let types: [any SyncedModel.Type] = [
         Member.self, BudgetCategory.self, LedgerEntry.self, Bill.self, Account.self, LinkedBank.self, PayeeRule.self,
+        Loan.self, OwnedAsset.self, NetWorthSnapshot.self, Stash.self, StashMove.self, BillStatement.self,
     ]
 
+    /// The model type for a CloudKit record type ("BudgetMember", "LedgerEntry").
     static func type(named name: String) -> (any SyncedModel.Type)? {
         types.first { $0.recordType == name }
+    }
+
+    /// The model type for a SwiftData entity name ("Member"), as history reports it. Not the
+    /// same as the record type for every model (`Member` is "BudgetMember" in CloudKit).
+    static func type(entityName: String) -> (any SyncedModel.Type)? {
+        types.first { String(describing: $0) == entityName }
     }
 
     static func recordName(type: String, id: UUID) -> String {
@@ -96,6 +104,12 @@ private extension SyncedModel {
         case let model as Account: model.id = id
         case let model as LinkedBank: model.id = id
         case let model as PayeeRule: model.id = id
+        case let model as Loan: model.id = id
+        case let model as OwnedAsset: model.id = id
+        case let model as NetWorthSnapshot: model.id = id
+        case let model as Stash: model.id = id
+        case let model as StashMove: model.id = id
+        case let model as BillStatement: model.id = id
         default: assertionFailure("Unknown synced model \(Self.self)")
         }
     }
@@ -148,7 +162,9 @@ enum SyncAssetFiles {
 // MARK: - Models
 
 extension Member: SyncedModel {
-    static var recordType: String { "Member" }
+    /// Not "Member": the Hearth container's household zone already has a "Member" record type
+    /// with different fields (unencrypted name, number sortOrder).
+    static var recordType: String { "BudgetMember" }
     static func blank() -> Member { Member(name: "", color: .green) }
     static func find(_ id: UUID, in context: ModelContext) -> Member? {
         var descriptor = FetchDescriptor<Member>(predicate: #Predicate { $0.id == id })
@@ -200,6 +216,8 @@ extension BudgetCategory: SyncedModel {
         record.put("repeatsMonthly", repeatsMonthly)
         record.put("sortOrder", sortOrder)
         record.put("isArchived", isArchived)
+        record.put("isEssential", isEssential)
+        record.put("taxTagRaw", taxTagRaw)
         record.put("createdAt", createdAt)
     }
 
@@ -213,6 +231,8 @@ extension BudgetCategory: SyncedModel {
         if let value = record.bool("repeatsMonthly") { repeatsMonthly = value }
         if let value = record.int("sortOrder") { sortOrder = value }
         if let value = record.bool("isArchived") { isArchived = value }
+        isEssential = record.bool("isEssential")
+        if let value = record.text("taxTagRaw") { taxTagRaw = value }
         if let value = record.date("createdAt") { createdAt = value }
     }
 }
@@ -244,6 +264,12 @@ extension LedgerEntry: SyncedModel {
         record.put("placeAddress", placeAddress)
         record.put("externalID", externalID)
         record.put("logoURL", logoURL)
+        record.put("splitsJSON", splitsJSON)
+        record.put("receiptSourceRaw", receiptSourceRaw)
+        record.put("receiptLink", receiptLink)
+        record.put("stashID", stashID)
+        record.put("stashCents", stashCents)
+        record.put("taxTagRaw", taxTagRaw)
         record.put("createdAt", createdAt)
         SyncAssetFiles.put(receiptData, on: record, key: "receipt", id: id)
     }
@@ -266,6 +292,12 @@ extension LedgerEntry: SyncedModel {
         placeAddress = record.text("placeAddress")
         externalID = record.text("externalID")
         logoURL = record.text("logoURL")
+        if let value = record.text("splitsJSON") { splitsJSON = value }
+        if let value = record.text("receiptSourceRaw") { receiptSourceRaw = value }
+        if let value = record.text("receiptLink") { receiptLink = value }
+        stashID = record.uuid("stashID")
+        if let value = record.int("stashCents") { stashCents = value }
+        if let value = record.text("taxTagRaw") { taxTagRaw = value }
         if let value = record.date("createdAt") { createdAt = value }
         let receipt = SyncAssetFiles.data(from: record, key: "receipt")
         if receipt != receiptData { receiptData = receipt }
@@ -298,6 +330,7 @@ extension Bill: SyncedModel {
         record.put("isSubscription", isSubscription)
         record.put("isActive", isActive)
         record.put("note", note)
+        record.put("payURL", payURL)
         record.put("createdAt", createdAt)
     }
 
@@ -318,6 +351,7 @@ extension Bill: SyncedModel {
         if let value = record.bool("isSubscription") { isSubscription = value }
         if let value = record.bool("isActive") { isActive = value }
         if let value = record.text("note") { note = value }
+        if let value = record.text("payURL") { payURL = value }
         if let value = record.date("createdAt") { createdAt = value }
     }
 }
@@ -344,6 +378,7 @@ extension Account: SyncedModel {
         record.put("colorHex", colorHex)
         record.put("plaidItemID", plaidItemID)
         record.put("plaidAccountID", plaidAccountID)
+        record.put("isEmergencyFund", isEmergencyFund)
         record.put("sortOrder", sortOrder)
         record.put("createdAt", createdAt)
     }
@@ -361,6 +396,7 @@ extension Account: SyncedModel {
         if let value = record.int("colorHex") { colorHex = value }
         plaidItemID = record.text("plaidItemID")
         plaidAccountID = record.text("plaidAccountID")
+        isEmergencyFund = record.bool("isEmergencyFund")
         if let value = record.int("sortOrder") { sortOrder = value }
         if let value = record.date("createdAt") { createdAt = value }
     }
@@ -410,12 +446,237 @@ extension PayeeRule: SyncedModel {
     func write(to record: CKRecord) {
         record.put("payeeKey", payeeKey)
         record.put("categoryID", categoryID)
+        record.put("taxTagRaw", taxTagRaw)
         record.put("createdAt", createdAt)
     }
 
     func read(from record: CKRecord) {
         if let value = record.text("payeeKey") { payeeKey = value }
         categoryID = record.uuid("categoryID")
+        if let value = record.text("taxTagRaw") { taxTagRaw = value }
         if let value = record.date("createdAt") { createdAt = value }
+    }
+}
+
+extension Loan: SyncedModel {
+    static var recordType: String { "Loan" }
+    static func blank() -> Loan { Loan(name: "", kind: .other, originalCents: 0, annualRate: 0, termMonths: 0, firstPaymentDate: .now, paymentCents: 0, balanceCents: 0) }
+    static func find(_ id: UUID, in context: ModelContext) -> Loan? {
+        var descriptor = FetchDescriptor<Loan>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    func write(to record: CKRecord) {
+        record.put("name", name)
+        record.put("lender", lender)
+        record.put("kindRaw", kindRaw)
+        record.put("colorRaw", colorRaw)
+        record.put("originalCents", originalCents)
+        record.put("annualRate", annualRate)
+        record.put("termMonths", termMonths)
+        record.put("firstPaymentDate", firstPaymentDate)
+        record.put("paymentCents", paymentCents)
+        record.put("escrowCents", escrowCents)
+        record.put("balanceCents", balanceCents)
+        record.put("balanceDate", balanceDate)
+        record.put("extraMonthlyCents", extraMonthlyCents)
+        record.put("accountID", accountID)
+        record.put("note", note)
+        record.put("isPaidOff", isPaidOff)
+        record.put("sortOrder", sortOrder)
+        record.put("createdAt", createdAt)
+    }
+
+    func read(from record: CKRecord) {
+        if let value = record.text("name") { name = value }
+        if let value = record.text("lender") { lender = value }
+        if let value = record.text("kindRaw") { kindRaw = value }
+        if let value = record.text("colorRaw") { colorRaw = value }
+        if let value = record.int("originalCents") { originalCents = value }
+        if let value = record.double("annualRate") { annualRate = value }
+        if let value = record.int("termMonths") { termMonths = value }
+        if let value = record.date("firstPaymentDate") { firstPaymentDate = value }
+        if let value = record.int("paymentCents") { paymentCents = value }
+        if let value = record.int("escrowCents") { escrowCents = value }
+        if let value = record.int("balanceCents") { balanceCents = value }
+        if let value = record.date("balanceDate") { balanceDate = value }
+        if let value = record.int("extraMonthlyCents") { extraMonthlyCents = value }
+        accountID = record.uuid("accountID")
+        if let value = record.text("note") { note = value }
+        if let value = record.bool("isPaidOff") { isPaidOff = value }
+        if let value = record.int("sortOrder") { sortOrder = value }
+        if let value = record.date("createdAt") { createdAt = value }
+    }
+}
+
+extension OwnedAsset: SyncedModel {
+    static var recordType: String { "OwnedAsset" }
+    static func blank() -> OwnedAsset { OwnedAsset(name: "", kind: .other, valueCents: 0) }
+    static func find(_ id: UUID, in context: ModelContext) -> OwnedAsset? {
+        var descriptor = FetchDescriptor<OwnedAsset>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    func write(to record: CKRecord) {
+        record.put("name", name)
+        record.put("kindRaw", kindRaw)
+        record.put("valueCents", valueCents)
+        record.put("valueDate", valueDate)
+        record.put("note", note)
+        record.put("sortOrder", sortOrder)
+        record.put("createdAt", createdAt)
+    }
+
+    func read(from record: CKRecord) {
+        if let value = record.text("name") { name = value }
+        if let value = record.text("kindRaw") { kindRaw = value }
+        if let value = record.int("valueCents") { valueCents = value }
+        if let value = record.date("valueDate") { valueDate = value }
+        if let value = record.text("note") { note = value }
+        if let value = record.int("sortOrder") { sortOrder = value }
+        if let value = record.date("createdAt") { createdAt = value }
+    }
+}
+
+extension NetWorthSnapshot: SyncedModel {
+    static var recordType: String { "NetWorthSnapshot" }
+    static func blank() -> NetWorthSnapshot { NetWorthSnapshot(month: .distantPast, assetsCents: 0, debtsCents: 0) }
+    static func find(_ id: UUID, in context: ModelContext) -> NetWorthSnapshot? {
+        var descriptor = FetchDescriptor<NetWorthSnapshot>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    func write(to record: CKRecord) {
+        record.put("month", month)
+        record.put("assetsCents", assetsCents)
+        record.put("debtsCents", debtsCents)
+        record.put("updatedAt", updatedAt)
+        record.put("createdAt", createdAt)
+    }
+
+    func read(from record: CKRecord) {
+        if let value = record.date("month") { month = value }
+        if let value = record.int("assetsCents") { assetsCents = value }
+        if let value = record.int("debtsCents") { debtsCents = value }
+        if let value = record.date("updatedAt") { updatedAt = value }
+        if let value = record.date("createdAt") { createdAt = value }
+    }
+}
+
+extension Stash: SyncedModel {
+    static var recordType: String { "Stash" }
+    static func blank() -> Stash { Stash(name: "", targetCents: 0, dueDate: .now) }
+    static func find(_ id: UUID, in context: ModelContext) -> Stash? {
+        var descriptor = FetchDescriptor<Stash>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    func write(to record: CKRecord) {
+        record.put("name", name)
+        record.put("symbol", symbol)
+        record.put("colorRaw", colorRaw)
+        record.put("targetCents", targetCents)
+        record.put("dueDate", dueDate)
+        record.put("repeatsYearly", repeatsYearly)
+        record.put("openingCents", openingCents)
+        record.put("accountID", accountID)
+        record.put("billID", billID)
+        record.put("countsAutomatically", countsAutomatically)
+        record.put("isEssential", isEssential)
+        record.put("isArchived", isArchived)
+        record.put("sortOrder", sortOrder)
+        record.put("createdAt", createdAt)
+    }
+
+    func read(from record: CKRecord) {
+        if let value = record.text("name") { name = value }
+        if let value = record.text("symbol") { symbol = value }
+        if let value = record.text("colorRaw") { colorRaw = value }
+        if let value = record.int("targetCents") { targetCents = value }
+        if let value = record.date("dueDate") { dueDate = value }
+        if let value = record.bool("repeatsYearly") { repeatsYearly = value }
+        if let value = record.int("openingCents") { openingCents = value }
+        accountID = record.uuid("accountID")
+        billID = record.uuid("billID")
+        if let value = record.bool("countsAutomatically") { countsAutomatically = value }
+        if let value = record.bool("isEssential") { isEssential = value }
+        if let value = record.bool("isArchived") { isArchived = value }
+        if let value = record.int("sortOrder") { sortOrder = value }
+        if let value = record.date("createdAt") { createdAt = value }
+    }
+}
+
+extension StashMove: SyncedModel {
+    static var recordType: String { "StashMove" }
+    static func blank() -> StashMove { StashMove(stashID: UUID(), month: .distantPast, amountCents: 0) }
+    static func find(_ id: UUID, in context: ModelContext) -> StashMove? {
+        var descriptor = FetchDescriptor<StashMove>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    func write(to record: CKRecord) {
+        record.put("stashID", stashID)
+        record.put("month", month)
+        record.put("amountCents", amountCents)
+        record.put("createdAt", createdAt)
+    }
+
+    func read(from record: CKRecord) {
+        stashID = record.uuid("stashID")
+        if let value = record.date("month") { month = value }
+        if let value = record.int("amountCents") { amountCents = value }
+        if let value = record.date("createdAt") { createdAt = value }
+    }
+}
+
+extension BillStatement: SyncedModel {
+    static var recordType: String { "BillStatement" }
+    static func blank() -> BillStatement { BillStatement(billID: nil, amountCents: 0, dueDate: .now, source: .shared) }
+    static func find(_ id: UUID, in context: ModelContext) -> BillStatement? {
+        var descriptor = FetchDescriptor<BillStatement>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    func write(to record: CKRecord) {
+        record.put("billID", billID)
+        record.put("amountCents", amountCents)
+        record.put("dueDate", dueDate)
+        record.put("periodStart", periodStart)
+        record.put("periodEnd", periodEnd)
+        record.put("chargesJSON", chargesJSON)
+        record.put("sourceRaw", sourceRaw)
+        record.put("sender", sender)
+        record.put("fileName", fileName)
+        record.put("documentType", documentType)
+        record.put("isReviewed", isReviewed)
+        record.put("usesAmount", usesAmount)
+        record.put("emailID", emailID)
+        record.put("createdAt", createdAt)
+        SyncAssetFiles.put(documentData, on: record, key: "document", id: id)
+    }
+
+    func read(from record: CKRecord) {
+        billID = record.uuid("billID")
+        if let value = record.int("amountCents") { amountCents = value }
+        if let value = record.date("dueDate") { dueDate = value }
+        periodStart = record.date("periodStart")
+        periodEnd = record.date("periodEnd")
+        if let value = record.text("chargesJSON") { chargesJSON = value }
+        if let value = record.text("sourceRaw") { sourceRaw = value }
+        if let value = record.text("sender") { sender = value }
+        if let value = record.text("fileName") { fileName = value }
+        if let value = record.text("documentType") { documentType = value }
+        if let value = record.bool("isReviewed") { isReviewed = value }
+        if let value = record.bool("usesAmount") { usesAmount = value }
+        if let value = record.text("emailID") { emailID = value }
+        if let value = record.date("createdAt") { createdAt = value }
+        let document = SyncAssetFiles.data(from: record, key: "document")
+        if document != documentData { documentData = document }
     }
 }

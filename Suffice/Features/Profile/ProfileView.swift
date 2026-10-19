@@ -2,8 +2,9 @@ import AuthenticationServices
 import SwiftData
 import SwiftUI
 
-/// Profile, from the avatar at the top right: who you are, the household, connected accounts,
-/// about, the Face ID lock, and erasing everything.
+/// Profile, from the avatar at the top right: who you are, the household (the Hearth household,
+/// the same in every Hearth app), connected accounts, about, the Face ID lock, and erasing
+/// everything.
 struct ProfileView: View {
     @Environment(\.modelContext) private var context
     @Environment(AppLock.self) private var lock
@@ -16,8 +17,11 @@ struct ProfileView: View {
     @State private var editingMe = false
     @State private var confirmsErase = false
     @State private var cloud = HouseholdSync.shared
+    @State private var family = HearthHouseholdStore.shared
 
     private var me: Member? { members.first { $0.id.uuidString == currentMember } }
+    /// You in the household, where your details are edited for every Hearth app.
+    private var myPerson: HearthMember? { family.me ?? me.flatMap(SufficeHearthHousehold.person(for:)) }
     @AppStorage(SettingsKey.remindBills) private var remindBills = false
     @AppStorage(SettingsKey.remindBudgets) private var remindBudgets = false
     @AppStorage(SettingsKey.remindWeekly) private var remindWeekly = false
@@ -32,26 +36,16 @@ struct ProfileView: View {
             VStack(spacing: 14) {
                 VStack(spacing: 6) {
                     if let me {
-                        // Tap to choose, change or remove your photo; saved right away.
-                        PhotoPickerAvatar(
-                            name: me.name,
-                            color: me.color,
-                            photo: Binding(
-                                get: { me.photoData },
-                                set: { newValue in
-                                    me.photoData = newValue
-                                    try? context.save()
-                                }
-                            ),
-                            size: 84,
-                            ring: .white.opacity(0.7)
-                        )
+                        // Your photo comes from the household; Edit changes it there.
+                        PersonAvatar(member: me, size: 84)
+                            .overlay(Circle().strokeBorder(.white.opacity(0.7), lineWidth: 3))
+                            .accessibilityHidden(true)
                     } else {
                         PersonAvatar(name: "?", color: .green, photo: nil, size: 84)
                             .overlay(Circle().strokeBorder(.white.opacity(0.7), lineWidth: 3))
                             .accessibilityHidden(true)
                     }
-                    Text(me?.name ?? "Set up your profile")
+                    Text(me?.name ?? myPerson?.trimmedName ?? "Set up your household")
                         .font(.title2.bold())
                     Text(statusLine)
                         .font(.footnote)
@@ -61,16 +55,33 @@ struct ProfileView: View {
                 .padding(.bottom, 10)
 
                 VStack(spacing: 0) {
-                    Button { editingMe = true } label: {
-                        ProfileRow(symbol: "person", color: Color(hex: 0x3D3D3D), title: "My info", value: "")
+                    if myPerson != nil {
+                        Button { editingMe = true } label: {
+                            ProfileRow(symbol: "person", color: Color(hex: 0x3D3D3D), title: "My info", value: "")
+                        }
+                        Divider().padding(.leading, 60)
                     }
-                    Divider().padding(.leading, 60)
-                    NavigationLink { HouseholdView() } label: {
-                        ProfileRow(symbol: "person.2", color: Color(hex: 0x7B61FF), title: "Household", value: cloud.isMember || cloud.isSharing ? "Shared" : (members.count == 1 ? "1 person" : "\(members.count) people"))
+                    // The people (added and edited only here), inviting the family, and who's
+                    // using this device. The budget is shared with the household's adults.
+                    NavigationLink { HearthHouseholdView(accent: Brand.green) } label: {
+                        ProfileRow(
+                            symbol: HearthHouseholdLabel.symbol,
+                            color: Color(hex: 0x7B61FF),
+                            title: HearthHouseholdLabel.title,
+                            value: family.exists ? (family.people.count == 1 ? "1 person" : "\(family.people.count) people") : "Set up"
+                        )
                     }
                     Divider().padding(.leading, 60)
                     NavigationLink { AccountsListView() } label: {
                         ProfileRow(symbol: "building.columns", color: Color(hex: 0x2563C9), title: "Connected accounts", value: "\(accounts.count)")
+                    }
+                    Divider().padding(.leading, 60)
+                    NavigationLink { TaxYearView() } label: {
+                        ProfileRow(symbol: "doc.text.magnifyingglass", color: Color(hex: 0x1E7A40), title: "Tax Year", value: String(Calendar.current.component(.year, from: .now)))
+                    }
+                    Divider().padding(.leading, 60)
+                    NavigationLink { EmailConnectView() } label: {
+                        ProfileRow(symbol: "envelope.badge", color: Color(hex: 0xC2410C), title: "Receipts from Email", value: MailAccounts.shared.isConnected ? "On" : "")
                     }
                     Divider().padding(.leading, 60)
                     #if DEBUG
@@ -152,22 +163,27 @@ struct ProfileView: View {
             ToolbarItem(placement: .principal) {
                 Color.clear.frame(width: 1, height: 1).accessibilityHidden(true)
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { editingMe = true } label: {
-                    Text("Edit").foregroundStyle(.white)
+            if myPerson != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { editingMe = true } label: {
+                        Text("Edit").foregroundStyle(.white)
+                    }
                 }
             }
         }
+        // Your details live in the household, for every Hearth app.
         .sheet(isPresented: $editingMe) {
-            MemberEditor(member: me, isMe: true)
+            if let myPerson {
+                HearthPersonEditor(member: myPerson, accent: Brand.green)
+            }
         }
         .alert(cloud.isMember ? "Leave the Household?" : "Erase App Data?", isPresented: $confirmsErase) {
             Button("Cancel", role: .cancel) {}
             if cloud.isMember {
-                // Erasing would delete the household for both of you; leaving is the member's
-                // way to clear this device.
+                // Erasing would delete the family's budget for everyone; leaving the household is
+                // a member's way to clear this device.
                 Button("Leave", role: .destructive) {
-                    Task { await cloud.leaveHousehold() }
+                    Task { await family.leave() }
                 }
             } else {
                 Button("Erase", role: .destructive) {
@@ -185,7 +201,7 @@ struct ProfileView: View {
             }
         } message: {
             if cloud.isMember {
-                Text("You’re in a shared household, so erasing would delete it for everyone. Leaving removes it from this \(DeviceName.current) and brings back your own budget.")
+                Text("You’re in your family’s budget, so erasing would delete it for everyone. Leaving the household removes it from every Hearth app on this \(DeviceName.current) and brings back your own budget.")
             } else if cloud.isSharing {
                 Text("This disconnects your banks and removes every transaction, budget, bill, account and person from your devices, your iCloud and everyone you share the household with. It can't be undone.\(appleUserID.isEmpty ? "" : " You’ll also be signed out of the other Hearth apps on this \(DeviceName.current).")")
             } else {
@@ -310,8 +326,8 @@ private struct CloudSyncView: View {
                 }
             } footer: {
                 Text(cloud.isMember
-                     ? "You’re in a shared household: it syncs through the iCloud of the person who shared it, with every change end-to-end encrypted."
-                     : "Your budget syncs through your private iCloud to your devices, and to anyone you share the household with, with every change end-to-end encrypted. Changes usually arrive within a minute while Suffice is open.")
+                     ? "You’re in your family’s budget: it syncs through the iCloud of the person who shared the household, with every change end-to-end encrypted."
+                     : "Your budget syncs through your private iCloud (the Hearth container’s Budget zone) to your devices, and to the parents and adults in your household, with every change end-to-end encrypted. Changes usually arrive within a minute while Suffice is open.")
             }
             if let error = cloud.lastError {
                 Section("Last Problem") {
@@ -370,12 +386,12 @@ private struct SufficeSyncCard: View {
         }
     }
 
-    /// Who the budget is shared with: once someone has been invited, or when this is someone
-    /// else's household.
+    /// Who the budget is shared with: once a parent or adult in the household has joined, or when
+    /// this is someone else's budget.
     private var sharing: HearthSyncSharing? {
         guard cloud.isMember || (cloud.isSharing && !cloud.participants.isEmpty) else { return nil }
         return HearthSyncSharing(
-            label: members.count > 2 ? "Your household" : "Your partner",
+            label: "Your household",
             people: members.map { HearthSyncSharing.Person(id: $0.id.uuidString, initial: $0.initial, colorHex: $0.color.inkHex) }
         )
     }

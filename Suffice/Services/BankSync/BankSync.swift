@@ -170,6 +170,8 @@ enum BankSync {
         }
         // Payments for bills mark those bills paid.
         BillMatcher.link(arrived, in: context)
+        // Then tags from payee rules and budgets.
+        for entry in arrived { Ledger.stampTaxTag(entry, in: context) }
 
         // Changes from the bank (a tip added, a merchant renamed). People's own edits to the
         // category, person and note stay.
@@ -177,8 +179,23 @@ enum BankSync {
             guard let entry = existing[transaction.id] else { continue }
             entry.date = day(transaction.date)
             entry.payee = transaction.payee
+            let oldCents = entry.amountCents
             entry.amountCents = transaction.amountCents
             entry.kind = transaction.isIncome ? .income : .expense
+            // A split charge whose amount changed (a tip added): the last part takes the
+            // difference, and it goes back to New so someone checks the split.
+            if entry.isSplit, oldCents != entry.amountCents {
+                let parts = entry.kind == .expense ? SplitMath.rebalanced(entry.splits, total: entry.amountCents) : []
+                entry.splits = parts
+                if let primary = SplitMath.primaryCategory(parts) { entry.categoryID = primary }
+                entry.isReviewed = false
+            }
+            // What a stash covers follows the new amount.
+            if entry.stashID != nil, entry.kind != .expense {
+                StashScheduler.pay(entry, from: nil, in: context)
+            } else {
+                StashScheduler.amountChanged(entry, from: oldCents, in: context)
+            }
             entry.bankCategory = transaction.categoryDetail ?? transaction.category ?? entry.bankCategory
             entry.logoURL = MerchantLogo.url(plaidLogo: transaction.logoUrl, domain: transaction.merchantDomain)?.absoluteString ?? entry.logoURL
         }

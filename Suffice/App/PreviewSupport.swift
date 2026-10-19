@@ -26,7 +26,8 @@ private struct PreviewEnvironment: ViewModifier {
 }
 
 /// The household from the MVP v2 designs: two people, three accounts, the six budgets with
-/// their subcategories, a few weeks of spending and the usual bills. Previews only.
+/// their subcategories, a few weeks of spending, the usual bills, and loans, assets and a year
+/// of net worth for Net Worth. Previews only.
 enum SampleData {
     static func insert(into context: ModelContext, calendar: Calendar = .current) {
         let steve = Member(name: "Steve", color: .green, sortOrder: 0)
@@ -86,6 +87,48 @@ enum SampleData {
         add("T-Mobile", 161_06, "Utilities", 10, steve, chase, reviewed: false)
         add("Walmart", 285_87, "Food/Groceries", 11, steve, appleCard, reviewed: false)
         add("Chick-fil-A", 12_35, "Food/Fast food", 12, partner, chase, reviewed: false)
+
+        // Loans, set up the day before their first payments, so the schedule brings them down.
+        func loan(_ name: String, _ lender: String, _ kind: LoanKind, _ cents: Int, _ rate: Double, _ months: Int, monthsAgo: Int, order: Int) {
+            let first = calendar.date(byAdding: .month, value: -monthsAgo, to: month.dueDate(day: 1, calendar: calendar)) ?? .now
+            let payment = LoanMath.payment(principalCents: cents, annualRate: rate, months: months)
+            let start = calendar.date(byAdding: .day, value: -1, to: first) ?? first
+            context.insert(Loan(name: name, lender: lender, kind: kind, originalCents: cents, annualRate: rate, termMonths: months, firstPaymentDate: first, paymentCents: payment, balanceCents: cents, balanceDate: start, sortOrder: order))
+        }
+        loan("Mortgage", "PennyMac", .mortgage, 385_000_00, 6.25, 360, monthsAgo: 64, order: 0)
+        loan("Auto loan", "Chase Auto", .auto, 28_500_00, 5.9, 60, monthsAgo: 30, order: 1)
+        loan("Student loan", "Nelnet", .student, 42_000_00, 4.99, 120, monthsAgo: 85, order: 2)
+        context.insert(OwnedAsset(name: "Home", kind: .home, valueCents: 512_000_00, sortOrder: 0))
+        context.insert(OwnedAsset(name: "Vehicle", kind: .vehicle, valueCents: 26_000_00, sortOrder: 1))
+        context.insert(OwnedAsset(name: "401(k)", kind: .investment, valueCents: 118_300_00, sortOrder: 2))
+        // Planning: a yearly bill to stash for, three stashes, and a few tax tags.
+        let insurance = Bill(name: "State Farm", amountCents: 1_380_00, dueDay: 15, color: .orange, categoryID: budgets["Home"]?.id)
+        insurance.frequency = .yearly
+        insurance.startDate = calendar.date(from: DateComponents(year: calendar.component(.year, from: .now), month: 3, day: 15)) ?? .now
+        context.insert(insurance)
+        func stash(_ name: String, _ symbol: String, _ color: CategoryColor, target: Int, monthsAhead: Int, day: Int, saved: Int, monthly: Int, automatic: Bool = true) {
+            let due = month.offset(by: monthsAhead, calendar: calendar).dueDate(day: day, calendar: calendar)
+            let item = Stash(name: name, symbol: symbol, color: color, targetCents: target, dueDate: due, openingCents: saved - monthly, accountID: chaseSavings.id)
+            item.countsAutomatically = automatic
+            item.createdAt = calendar.date(byAdding: .month, value: -3, to: .now) ?? .now
+            context.insert(item)
+            if automatic { context.insert(StashMove(stashID: item.id, month: month.start, amountCents: monthly)) }
+        }
+        stash("Christmas", "gift", .red, target: 1_200_00, monthsAhead: 2, day: 15, saved: 900_00, monthly: 150_00)
+        stash("Car registration", "car", .blue, target: 504_00, monthsAhead: 8, day: 20, saved: 126_00, monthly: 48_00)
+        stash("Back to school", "graduationcap", .purple, target: 600_00, monthsAhead: 10, day: 15, saved: 80_00, monthly: 0, automatic: false)
+        budgets["Giving"]?.taxTag = .charitable
+        let doctor = LedgerEntry(date: on(min(9, today)), payee: "Intermountain Health", amountCents: 185_00, categoryID: budgets["Home"]?.id, memberID: steve.id, accountID: chase.id)
+        doctor.taxTag = .medical
+        context.insert(doctor)
+        context.insert(PayeeRule(payee: "Walgreens", categoryID: nil, taxTag: .hsa))
+
+        // A year of history for the trend.
+        for monthsAgo in 1...11 {
+            let span = month.offset(by: -monthsAgo, calendar: calendar)
+            let growth = (11 - monthsAgo) * 3_400_00
+            context.insert(NetWorthSnapshot(month: span.start, assetsCents: 610_000_00 + growth, debtsCents: 412_000_00 - (11 - monthsAgo) * 1_900_00))
+        }
         try? context.save()
     }
 }

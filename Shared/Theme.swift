@@ -29,6 +29,16 @@ nonisolated enum SettingsKey {
     static let cardStyles = "overview.cardStyles"
     /// Someone who joined a household was asked which person they are.
     static let askedWhoAmI = "household.askedWhoAmI"
+    /// Net Worth's trend range (6M, 1Y, All).
+    static let netWorthRange = "netWorth.range"
+    /// Planning, kept in iCloud key-value storage (PlanningSettings) so it follows the Apple
+    /// Account: the emergency fund's goal in months, whether loan payments count as essentials,
+    /// and the bills whose stash suggestion someone dismissed (JSON array of IDs).
+    static let runwayGoalMonths = "planning.runwayGoalMonths"
+    static let loansAreEssential = "planning.loansAreEssential"
+    static let dismissedStashSuggestions = "planning.dismissedStashSuggestions"
+    /// Tax Year's last chosen year.
+    static let taxYear = "tax.year"
 }
 
 /// Suffice's brand colors, from the MVP v2 designs. The darker greens carry white text; the
