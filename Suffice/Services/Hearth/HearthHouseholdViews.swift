@@ -238,7 +238,7 @@ struct HearthHouseholdView: View {
     /// An invited person's name, or how they were invited.
     static func name(of participant: CKShare.Participant) -> String {
         if let components = participant.userIdentity.nameComponents {
-            let name = components.formatted(.name(style: .medium))
+            let name = PersonNameComponentsFormatter.localizedString(from: components, style: .medium)
             if !name.isEmpty { return name }
         }
         let lookup = participant.userIdentity.lookupInfo

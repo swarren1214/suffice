@@ -295,6 +295,8 @@ struct AppRoot: View {
                     )
                     // Then receipts and bills from email, matched to what the bank just sent.
                     await ReceiptScanner.shared.scanIfStale(in: context)
+                    // Then grocery receipts, read for BigTable's pantry.
+                    await GroceryReceipts.refresh(in: context)
                 }
                 // Only when coming back from the background: the Face ID prompt itself
                 // passes through inactive, and cancelling it shouldn't bring it back.
