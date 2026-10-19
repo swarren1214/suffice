@@ -16,6 +16,9 @@ struct AccountsListView: View {
     @State private var working: UUID?
     @State private var problem: String?
     @State private var disconnecting: LinkedBank?
+    /// Syncing and signing in to a bank again need Suffice Plus or Hearth+.
+    @State private var showsPaywall = false
+    @State private var purchases = HearthPurchases.shared
 
     var body: some View {
         let records = entries.map(\.record)
@@ -52,7 +55,11 @@ struct AccountsListView: View {
                 } header: {
                     Text("Banks")
                 } footer: {
-                    Text("Banks sync when Suffice opens (at most hourly) and when you pull down on Overview. Transactions are kept in your iCloud, not on a server.")
+                    if purchases.isUnlocked {
+                        Text("Banks sync when Suffice opens (at most hourly) and when you pull down on Overview. Transactions are kept in your iCloud, not on a server.")
+                    } else {
+                        Text("Everything these banks brought in stays. Syncing new transactions comes with Suffice Plus or Hearth+.")
+                    }
                 }
             }
             Section {
@@ -101,6 +108,7 @@ struct AccountsListView: View {
         .sheet(isPresented: $showsConnect) {
             ConnectView(step: nil) { showsConnect = false }
         }
+        .hearthPaywall(isPresented: $showsPaywall, feature: BankSync.paywallFeature)
     }
 }
 
@@ -120,6 +128,8 @@ extension AccountsListView {
             do {
                 try await work()
             } catch BankSyncError.cancelled {
+            } catch BankSyncError.needsPlan {
+                showsPaywall = true
             } catch {
                 problem = error.localizedDescription
             }

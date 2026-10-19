@@ -15,6 +15,8 @@ struct ConnectView: View {
     @State private var showsManual = false
     @State private var isConnecting = false
     @State private var connectError: String?
+    /// Connecting a bank needs Suffice Plus or Hearth+.
+    @State private var showsPaywall = false
     @Environment(\.modelContext) private var context
     @AppStorage(SettingsKey.currentMember) private var currentMember = ""
 
@@ -80,6 +82,7 @@ struct ConnectView: View {
         .sheet(isPresented: $showsManual) {
             AccountEditor(account: nil) { onFinish() }
         }
+        .hearthPaywall(isPresented: $showsPaywall, feature: BankSync.paywallFeature)
     }
 }
 
@@ -93,6 +96,8 @@ extension ConnectView {
                 onFinish()
             } catch BankSyncError.cancelled {
                 // They closed Apple's sheet or Plaid; nothing to say.
+            } catch BankSyncError.needsPlan {
+                showsPaywall = true
             } catch {
                 connectError = error.localizedDescription
             }

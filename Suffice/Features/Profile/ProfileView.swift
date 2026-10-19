@@ -47,6 +47,8 @@ struct ProfileView: View {
                     }
                     Text(me?.name ?? myPerson?.trimmedName ?? "Set up your household")
                         .font(.title2.bold())
+                    // "HEARTH+" or "SUFFICE PLUS" when they have a plan.
+                    HearthMemberBadge()
                     Text(statusLine)
                         .font(.footnote)
                 }
@@ -118,6 +120,13 @@ struct ProfileView: View {
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
 
                 ProfileAccount(me: me)
+
+                // Get Hearth+, or manage the plan.
+                HearthMembershipRow()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 54)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
 
                 SufficeSyncCard()
 
@@ -253,8 +262,9 @@ private struct ProfileAccount: View {
     }
 }
 
-/// Sign in with Apple for someone who chose "Not now" during onboarding.
-private struct ProfileAppleButton: View {
+/// Sign in with Apple for someone who chose "Not now" during onboarding. Also the paywall's
+/// "link your account" button (`HearthPurchases.configure(signInButton:)`).
+struct ProfileAppleButton: View {
     @Environment(\.modelContext) private var context
     @AppStorage(SettingsKey.appleUserID) private var appleUserID = ""
     @AppStorage(SettingsKey.currentMember) private var currentMember = ""

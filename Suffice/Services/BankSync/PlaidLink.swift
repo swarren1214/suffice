@@ -71,11 +71,14 @@ enum PlaidLink {
 enum BankSyncError: LocalizedError {
     case cancelled
     case link(String)
+    /// Connecting and syncing banks need Suffice Plus or Hearth+: show the paywall.
+    case needsPlan
 
     var errorDescription: String? {
         switch self {
         case .cancelled: nil
         case .link(let message): message
+        case .needsPlan: "Automatic bank sync comes with Suffice Plus or Hearth+."
         }
     }
 }

@@ -45,6 +45,22 @@ struct SufficeApp: App {
         WidgetSync.refresh(container.mainContext)
         // One sign-in for every Hearth app: follow sign-ins and sign-outs in BigTable and Sated.
         HearthSignIn.start()
+        // Suffice Plus and Hearth+ (RevenueCat). Screenshots show everything unlocked; nothing
+        // is set up until the real key is in AppConfig.
+        if ScreenshotMode.isOn { HearthPurchases.shared.previewUnlocked = true }
+        if AppConfig.revenueCatAPIKey != AppConfig.revenueCatPlaceholder {
+            HearthPurchases.shared.configure(
+                app: .suffice,
+                apiKey: AppConfig.revenueCatAPIKey,
+                apiBaseURL: AppConfig.apiBaseURL,
+                accessToken: {
+                    // Household plans need a real account; the anonymous session doesn't count.
+                    guard await HearthAPI.shared.isSignedInWithApple else { return nil }
+                    return try? await HearthAPI.shared.accessToken()
+                },
+                signInButton: { AnyView(ProfileAppleButton()) }
+            )
+        }
         HearthHousehold.start(container)
         // Siri learns the current budget and bill names for its phrases.
         SufficeShortcuts.updateAppShortcutParameters()
@@ -163,6 +179,7 @@ struct AppRoot: View {
     @State private var household = HouseholdSync.shared
     /// The Hearth household: the same family in every Hearth app. Suffice always has one.
     @State private var family = HearthHouseholdStore.shared
+    @State private var purchases = HearthPurchases.shared
 
     var body: some View {
         Group {
@@ -211,6 +228,20 @@ struct AppRoot: View {
         .onChange(of: family.exists) { Task { await household.updateSharing() } }
         .onChange(of: family.participants.count) { Task { await household.updateSharing() } }
         .onChange(of: family.info?.appShareURLs) { Task { await household.updateSharing() } }
+        // Just got the plan (bought, restored, or the household's): connected banks catch up.
+        .onChange(of: purchases.isUnlocked) { _, unlocked in
+            guard unlocked, !ScreenshotMode.isOn else { return }
+            Task {
+                await BankSync.syncAllIfStale(
+                    memberID: UUID(uuidString: UserDefaults.standard.string(forKey: SettingsKey.currentMember) ?? ""),
+                    in: context
+                )
+            }
+        }
+        // Just got Hearth+: allowance Caloma paid out comes in to review.
+        .onChange(of: purchases.hasHearthPlus) { _, has in
+            if has { CalomaAllowance.importPayouts(in: context) }
+        }
         // Widgets open suffice://overview, suffice://budget or suffice://bills.
         .onOpenURL { url in
             // A PDF or photo opened in Suffice (Share › Suffice, Open in Suffice): read it as a bill.

@@ -33,6 +33,9 @@ struct TransactionSheet: View {
     @State private var alwaysTag = false
     @State private var earlierCount = 0
     @State private var asksAboutEarlier = false
+    @State private var purchases = HearthPurchases.shared
+    /// Split From This Receipt needs Suffice Plus or Hearth+.
+    @State private var showsSplitPaywall = false
     @FocusState private var focus: Field?
 
     private enum Field { case payee, amount, note }
@@ -184,19 +187,15 @@ struct TransactionSheet: View {
 
                 if draft.kind == .expense, draft.receipt != nil, !draft.isSplit, draft.amountCents > 0, ReceiptSplitter.isAvailable {
                     Section {
-                        NavigationLink {
-                            splitEditor(suggests: true)
-                        } label: {
-                            Label {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Split From This Receipt").foregroundStyle(Brand.green)
-                                    Text("Reads the items on your \(DeviceName.current) and suggests budgets")
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
-                            } icon: {
-                                Image(systemName: "sparkles")
-                                    .foregroundStyle(Brand.green)
+                        if purchases.isUnlocked {
+                            NavigationLink {
+                                splitEditor(suggests: true)
+                            } label: {
+                                splitFromReceiptLabel
+                            }
+                        } else {
+                            Button { showsSplitPaywall = true } label: {
+                                splitFromReceiptLabel
                             }
                         }
                     }
@@ -229,6 +228,7 @@ struct TransactionSheet: View {
             }
             .navigationTitle(entry == nil ? "New \(draft.kind.name)" : "Transaction")
             .navigationBarTitleDisplayMode(.inline)
+            .hearthPaywall(isPresented: $showsSplitPaywall, feature: ReceiptSplitter.paywallFeature)
             .scrollDismissesKeyboard(.interactively)
             // Presented from here, outside the rows, so they stay open.
             .receiptPresenter(receipt: $draft.receipt, request: $receiptRequest, isPreparing: $preparingReceipt)
@@ -483,6 +483,20 @@ struct TransactionSheet: View {
             } label: {
                 Text("Edit Split").foregroundStyle(Brand.green)
             }
+        }
+    }
+
+    private var splitFromReceiptLabel: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Split From This Receipt").foregroundStyle(Brand.green)
+                Text("Reads the items on your \(DeviceName.current) and suggests budgets")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: "sparkles")
+                .foregroundStyle(Brand.green)
         }
     }
 

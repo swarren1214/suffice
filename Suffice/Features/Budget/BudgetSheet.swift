@@ -54,6 +54,7 @@ struct BudgetSheet: View {
     @State private var tagsEarlier = false
     @State private var earlierCount = 0
     @State private var asksAboutEarlier = false
+    @State private var purchases = HearthPurchases.shared
 
     enum Recurrence: String, CaseIterable, Identifiable {
         case monthly, once
@@ -420,10 +421,25 @@ struct BudgetSheet: View {
 
     /// BigTable's grocery list as planned spending, on a groceries budget this month: what's
     /// left to buy should cost, and whether that fits in what's left. Never a transaction.
+    /// The apps working together comes with Hearth+; without it, the Hearth+ teaser instead.
     @ViewBuilder
     private var bigTableGroceries: some View {
         if let status, month == MonthSpan(containing: .now), BigTableGroceries.isGroceries(name),
            let list = BigTableGroceries.currentList(), let toBuy = BigTableGroceries.remainingCents(list) {
+            if purchases.hasHearthPlus {
+                bigTableGroceriesCard(status: status, list: list, toBuy: toBuy)
+            } else {
+                HearthPlusTeaser(
+                    from: .bigtable,
+                    title: "Your BigTable grocery list could show here",
+                    detail: "See what's left to buy against this budget with Hearth+."
+                )
+            }
+        }
+    }
+
+    private func bigTableGroceriesCard(status: CategoryStatus, list: HearthGroceries.List, toBuy: Int) -> some View {
+        Group {
             let after = status.leftCents - toBuy
             Button {
                 if let url = BigTableGroceries.link { openURL(url) }

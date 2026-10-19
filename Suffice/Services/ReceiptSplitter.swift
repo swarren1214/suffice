@@ -31,6 +31,14 @@ enum ReceiptSplitter {
     /// Whether the suggestion can run here.
     static var isAvailable: Bool { OnDeviceModel.availability == .available }
 
+    /// Suggesting a split from a receipt comes with Suffice Plus or Hearth+. Splitting by hand
+    /// is free.
+    static let paywallFeature = HearthPaywallFeature(
+        "Receipt splitting",
+        detail: "Suffice reads the items on a receipt and splits the charge across your budgets.",
+        symbol: "sparkles"
+    )
+
     /// Suggested parts for a charge of `totalCents`, from its receipt photo.
     static func suggest(receipt: Data, totalCents: Int, categories: [BudgetCategory]) async throws -> [EntrySplit] {
         let availability = OnDeviceModel.availability

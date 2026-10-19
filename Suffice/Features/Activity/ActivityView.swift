@@ -101,6 +101,7 @@ private struct MonthActivity: View {
     @Environment(\.modelContext) private var context
     @State private var tab: ActivityTab = .all
     @State private var editing: LedgerEntry?
+    @State private var purchases = HearthPurchases.shared
 
     init(month: MonthSpan, filter: ActivityFilter) {
         self.month = month
@@ -142,6 +143,15 @@ private struct MonthActivity: View {
                 .allowsHitTesting(false)
             }
             .accessibilityValue(toReview.count > 0 ? "\(toReview.count) new" : "")
+
+            // Caloma's allowance payouts land in New with Hearth+.
+            if tab == .review, !purchases.hasHearthPlus, month == MonthSpan(containing: .now), CalomaAllowance.hasPayouts {
+                HearthPlusTeaser(
+                    from: .caloma,
+                    title: "Allowance from Caloma could land here",
+                    detail: "With Hearth+, allowance paid in Caloma comes in as expenses to review."
+                )
+            }
 
             if shown.isEmpty {
                 if tab == .review {

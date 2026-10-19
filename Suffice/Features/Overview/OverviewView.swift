@@ -58,22 +58,26 @@ struct OverviewView: View {
             }
 
             ScrollView {
-                Group {
-                    if let current {
-                        AccountDetail(
-                            account: current,
-                            palette: palette(for: current),
-                            style: style(for: current),
-                            setStyle: { setStyle($0, for: current) },
-                            records: records,
-                            entries: allEntries.filter { $0.accountID == current.id }.sorted { $0.date > $1.date },
-                            month: router.month,
-                            lookup: Lookup(categories: categories, members: members, accounts: accountList),
-                            edit: { editing = current },
-                            open: { openEntry = $0 }
-                        )
-                    } else {
-                        allAccounts
+                VStack(spacing: 16) {
+                    // The plan couldn't renew: update the payment method.
+                    HearthBillingBanner()
+                    Group {
+                        if let current {
+                            AccountDetail(
+                                account: current,
+                                palette: palette(for: current),
+                                style: style(for: current),
+                                setStyle: { setStyle($0, for: current) },
+                                records: records,
+                                entries: allEntries.filter { $0.accountID == current.id }.sorted { $0.date > $1.date },
+                                month: router.month,
+                                lookup: Lookup(categories: categories, members: members, accounts: accountList),
+                                edit: { editing = current },
+                                open: { openEntry = $0 }
+                            )
+                        } else {
+                            allAccounts
+                        }
                     }
                 }
                 .padding(.horizontal, 16)

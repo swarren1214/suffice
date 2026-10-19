@@ -7,14 +7,25 @@ import SwiftData
 /// Each payout comes in once. Its id is kept as the entry's `externalID`, so two devices
 /// importing the same payout are merged like a bank transaction (`CloudSync.mergeBankEntries`),
 /// and the ids already imported are remembered so a deleted one doesn't come back.
+///
+/// The apps working together comes with Hearth+: without it nothing is imported (and the
+/// "since" date isn't set, so getting Hearth+ later brings in the week before, not months).
+/// Activity › New shows the Hearth+ teaser instead when Caloma has payouts to share.
 enum CalomaAllowance {
     static let idPrefix = "caloma-allowance:"
     private static let importedKey = "hearth.calomaAllowance.imported"
     /// Payouts before this aren't imported: on first run, the week before Suffice first looked.
     private static let sinceKey = "hearth.calomaAllowance.since"
 
+    /// Caloma has shared allowance payouts (for the Hearth+ teaser).
+    static var hasPayouts: Bool {
+        guard !ScreenshotMode.isOn, let allowance = Hearth.read(HearthAllowance.self, from: .caloma)?.value else { return false }
+        return !allowance.payouts.isEmpty
+    }
+
     static func importPayouts(in context: ModelContext, now: Date = .now) {
         guard !ScreenshotMode.isOn,
+              HearthPurchases.shared.hasHearthPlus,
               let allowance = Hearth.read(HearthAllowance.self, from: .caloma)?.value else { return }
         let defaults = UserDefaults.standard
         let since: Date

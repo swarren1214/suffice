@@ -307,6 +307,13 @@ nonisolated struct AskSufficeIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+        // Ask Suffice comes with Suffice Plus or Hearth+.
+        let purchases = HearthPurchases.shared
+        if !purchases.isUnlocked { await purchases.refresh() }
+        guard purchases.isUnlocked else {
+            let message = "Ask Suffice comes with Suffice Plus or Hearth+. Open Suffice to see the plans."
+            return .result(value: message, dialog: IntentDialog(stringLiteral: message))
+        }
         let answer = await AskEngine.shared.answerOnce(question, container: Persistence.shared)
         return .result(value: answer, dialog: IntentDialog(stringLiteral: answer))
     }

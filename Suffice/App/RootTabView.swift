@@ -12,6 +12,15 @@ struct RootTabView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     /// Only screenshot mode pushes onto it (Profile and Household).
     @State private var overviewPath = NavigationPath()
+    @State private var purchases = HearthPurchases.shared
+    /// Ask Suffice, typed or by voice, comes with Suffice Plus or Hearth+.
+    @State private var showsAskPaywall = false
+
+    static let askFeature = HearthPaywallFeature(
+        "Ask Suffice",
+        detail: "Ask about your budget, bills and spending, typed or out loud. Answered on your device.",
+        symbol: "sparkles"
+    )
 
     var body: some View {
         @Bindable var router = router
@@ -56,9 +65,19 @@ struct RootTabView: View {
         .tabViewStyle(.sidebarAdaptable)
         .tabViewSearchActivation(.searchTabSelection)
         .tabBarMinimizeBehavior(.onScrollDown)
-        .sheet(isPresented: $router.showsAsk) {
+        .sheet(isPresented: Binding(
+            get: { self.router.showsAsk && purchases.isUnlocked },
+            set: { self.router.showsAsk = $0 }
+        )) {
             AskView()
         }
+        // The ✨ button, ⌘K: without the plan, the paywall instead of Ask.
+        .onChange(of: router.showsAsk, initial: true) { _, shows in
+            guard shows, !purchases.isUnlocked else { return }
+            self.router.showsAsk = false
+            showsAskPaywall = true
+        }
+        .hearthPaywall(isPresented: $showsAskPaywall, feature: Self.askFeature)
         .screenshotStage(overviewPath: $overviewPath)
     }
 

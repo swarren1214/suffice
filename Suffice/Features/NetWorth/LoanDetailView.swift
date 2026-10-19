@@ -11,6 +11,7 @@ struct LoanDetailView: View {
     @State private var editing = false
     @State private var scheduleView: ScheduleView = .yearly
     @State private var showsAllMonths = false
+    @State private var purchases = HearthPurchases.shared
 
     enum ScheduleView: String, CaseIterable, Identifiable {
         case yearly, monthly
@@ -55,17 +56,26 @@ struct LoanDetailView: View {
                 }
                 ScheduleTable(projection: projection, view: scheduleView, showsAllMonths: $showsAllMonths)
 
-                NavigationLink {
-                    PayoffPlanView(startingLoan: loan)
-                } label: {
-                    Label("Plan a Payoff", systemImage: "slider.horizontal.3")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 40)
+                // The payoff planner comes with Suffice Plus or Hearth+; the loan and its
+                // schedule are free.
+                if purchases.isUnlocked {
+                    NavigationLink {
+                        PayoffPlanView(startingLoan: loan)
+                    } label: {
+                        Label("Plan a Payoff", systemImage: "slider.horizontal.3")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 40)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .tint(Brand.green)
+                } else {
+                    HearthLockedCard(
+                        "Plan a payoff",
+                        detail: "Try extra payments, a lump sum, a new rate or biweekly payments, and see the payoff date and interest saved."
+                    )
                 }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                .tint(Brand.green)
             }
         }
         .refreshable { await HouseholdSync.shared.syncNow() }

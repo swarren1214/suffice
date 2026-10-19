@@ -13,6 +13,7 @@
 		5F1C00000000000000000048 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 5F1C00000000000000000046 /* MLX */; };
 		5F1C0000000000000000005C /* SufficeWatchWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5F1C00000000000000000051 /* SufficeWatchWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5F1C0000000000000000006B /* SufficeWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5F1C00000000000000000050 /* SufficeWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8BE8E598D9186143DB9757C7 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = B6A427F4AB61B4CE585919B2 /* RevenueCat */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -136,6 +137,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8BE8E598D9186143DB9757C7 /* RevenueCat in Frameworks */,
 				5F1C00000000000000000042 /* LinkKit in Frameworks */,
 				5F1C00000000000000000047 /* KokoroSwift in Frameworks */,
 				5F1C00000000000000000048 /* MLX in Frameworks */,
@@ -231,6 +233,7 @@
 			);
 			name = Suffice;
 			packageProductDependencies = (
+				B6A427F4AB61B4CE585919B2 /* RevenueCat */,
 				5F1C00000000000000000041 /* LinkKit */,
 				5F1C00000000000000000045 /* KokoroSwift */,
 				5F1C00000000000000000046 /* MLX */,
@@ -371,6 +374,7 @@
 			mainGroup = 5F1C00000000000000000002;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				2C4DAD7F5668DA5417AA793D /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
 				5F1C00000000000000000040 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */,
 				5F1C00000000000000000043 /* XCLocalSwiftPackageReference "Packages/KokoroSwift" */,
 				5F1C00000000000000000044 /* XCRemoteSwiftPackageReference "mlx-swift" */,
@@ -919,6 +923,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		2C4DAD7F5668DA5417AA793D /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.0.0;
+			};
+		};
 		5F1C00000000000000000040 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/plaid/plaid-link-ios-spm";
@@ -952,6 +964,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5F1C00000000000000000044 /* XCRemoteSwiftPackageReference "mlx-swift" */;
 			productName = MLX;
+		};
+		B6A427F4AB61B4CE585919B2 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2C4DAD7F5668DA5417AA793D /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

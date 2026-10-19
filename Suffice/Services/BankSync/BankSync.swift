@@ -9,21 +9,42 @@ import SwiftData
 /// Sync: the API returns what's new, changed and removed since the bank's cursor, plus balances.
 /// New transactions land in Activity › New, with a category when a payee rule knows the
 /// merchant. Transactions only live here and in iCloud; the API never stores them.
+///
+/// Connecting and syncing need Suffice Plus or Hearth+ (`HearthPurchases.isUnlocked`); without
+/// it they throw `BankSyncError.needsPlan` (also what the API's 402 `ENTITLEMENT_REQUIRED`
+/// becomes) and the automatic syncs skip quietly. Accounts and transactions already brought in
+/// stay, and disconnecting is always free.
 @MainActor
 enum BankSync {
     private static let log = Logger(subsystem: "com.stephenwarren.suffice", category: "bank-sync")
+
+    /// How the paywall names this feature.
+    static let paywallFeature = HearthPaywallFeature(
+        "Automatic bank sync",
+        detail: "Connect your banks and let transactions come in on their own.",
+        symbol: "building.columns"
+    )
+
+    /// Throws `.needsPlan` without Suffice Plus or Hearth+. `refreshing` checks with the store
+    /// first (for the automatic syncs, which can run before the plan has loaded at launch).
+    private static func requirePlan(refreshing: Bool = false) async throws {
+        let purchases = HearthPurchases.shared
+        if refreshing, !purchases.isUnlocked { await purchases.refresh() }
+        guard purchases.isUnlocked else { throw BankSyncError.needsPlan }
+    }
 
     // MARK: Connect
 
     /// Walks someone through connecting a bank. Throws `.cancelled` if they back out.
     @discardableResult
     static func connect(memberID: UUID?, in context: ModelContext) async throws -> LinkedBank {
+        try await requirePlan()
         if !(await HearthAPI.shared.isSignedInWithApple) {
             try await AppleSignIn.signIn()
         }
         let linkToken = try await withAppleRetry { try await HearthAPI.shared.plaidLinkToken() }
         let link = try await PlaidLink.open(linkToken: linkToken)
-        let connection = try await HearthAPI.shared.connectBank(publicToken: link.publicToken)
+        let connection = try await mapPlan { try await HearthAPI.shared.connectBank(publicToken: link.publicToken) }
 
         let bank = existingBank(itemID: connection.itemId, in: context) ?? {
             let bank = LinkedBank(
@@ -44,6 +65,7 @@ enum BankSync {
 
     /// For a bank that needs signing in again: Link in update mode, then a sync.
     static func reconnect(_ bank: LinkedBank, memberID: UUID?, in context: ModelContext) async throws {
+        try await requirePlan()
         let linkToken = try await withAppleRetry { try await HearthAPI.shared.plaidLinkToken(itemID: bank.itemID) }
         _ = try await PlaidLink.open(linkToken: linkToken)
         // A successful sync clears needsReconnect.
@@ -73,6 +95,7 @@ enum BankSync {
 
     /// Brings one bank up to date, page by page.
     static func sync(_ bank: LinkedBank, memberID: UUID?, in context: ModelContext) async throws {
+        try await requirePlan()
         var page: BankSyncPage
         repeat {
             do {
@@ -81,6 +104,8 @@ enum BankSync {
                 bank.needsReconnect = true
                 try? context.save()
                 throw failure
+            } catch let failure as HearthAPI.APIFailure where failure.needsPlan {
+                throw BankSyncError.needsPlan
             }
             apply(page, to: bank, memberID: memberID, in: context)
         } while page.hasMore
@@ -91,6 +116,8 @@ enum BankSync {
     /// the rest; banks needing a new sign-in are marked.
     static func syncAll(memberID: UUID?, in context: ModelContext) async {
         guard await HearthAPI.shared.isSignedInWithApple else { return }
+        // Without the plan, banks already connected keep what they brought in but don't sync.
+        do { try await requirePlan(refreshing: true) } catch { return }
         let me = UserDefaults.standard.string(forKey: SettingsKey.appleUserID) ?? ""
         let banks = ((try? context.fetch(FetchDescriptor<LinkedBank>())) ?? [])
             .filter { $0.connectedByAppleID.isEmpty || $0.connectedByAppleID == me }
@@ -228,10 +255,19 @@ enum BankSync {
     /// Retries once after Sign in with Apple when the API says banking needs it.
     private static func withAppleRetry<T>(_ call: () async throws -> T) async throws -> T {
         do {
-            return try await call()
+            return try await mapPlan(call)
         } catch let failure as HearthAPI.APIFailure where failure.needsAppleSignIn {
             try await AppleSignIn.signIn()
+            return try await mapPlan(call)
+        }
+    }
+
+    /// The API's 402 `ENTITLEMENT_REQUIRED` as `BankSyncError.needsPlan`, so callers show the paywall.
+    private static func mapPlan<T>(_ call: () async throws -> T) async throws -> T {
+        do {
             return try await call()
+        } catch let failure as HearthAPI.APIFailure where failure.needsPlan {
+            throw BankSyncError.needsPlan
         }
     }
 

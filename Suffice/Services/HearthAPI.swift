@@ -77,6 +77,8 @@ actor HearthAPI {
         var needsBankReauth: Bool { code == "CONNECTION_NEEDS_REAUTH" }
         /// Banking needs Sign in with Apple, not the anonymous session.
         var needsAppleSignIn: Bool { code == "REGISTERED_IDENTITY_REQUIRED" }
+        /// The feature needs Suffice Plus or Hearth+ (HTTP 402).
+        var needsPlan: Bool { code == "ENTITLEMENT_REQUIRED" || status == 402 }
     }
 
     private nonisolated struct APIErrorEnvelope: Decodable {

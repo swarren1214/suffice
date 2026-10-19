@@ -16,6 +16,12 @@ enum AppConfig {
     /// have. Empty shows initials instead.
     nonisolated static let logoDevPublishableKey = "pk_WdicpzisRSC2-QwpXtq6FA"
 
+    /// RevenueCat's public Apple key for Suffice (appl_…), for Suffice Plus and Hearth+. The same
+    /// key in Debug. Until it's filled in, purchases aren't set up and the paid features stay
+    /// locked (see `revenueCatPlaceholder`).
+    nonisolated static let revenueCatAPIKey = "appl_XZntwEhMxYprhBXEaiEDkhGFkVP"
+    nonisolated static let revenueCatPlaceholder = "REVENUECAT_PUBLIC_KEY"
+
     /// Receipts from Email: the OAuth client IDs Suffice signs in to mailboxes with (read-only).
     /// Empty leaves that mailbox's Connect off. See README › Receipts from email for setting
     /// them up.

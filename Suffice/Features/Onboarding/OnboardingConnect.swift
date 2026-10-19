@@ -14,6 +14,8 @@ struct OnboardingConnect: View {
     @State private var connectError: String?
     @State private var walletNotice = false
     @State private var showsManual = false
+    /// Connecting a bank needs Suffice Plus or Hearth+.
+    @State private var showsPaywall = false
 
     private var manualAccounts: [Account] { accounts.filter { $0.source == .manual } }
 
@@ -56,6 +58,7 @@ struct OnboardingConnect: View {
         } message: {
             Text(connectError ?? "")
         }
+        .hearthPaywall(isPresented: $showsPaywall, feature: BankSync.paywallFeature)
         .sheet(isPresented: $showsManual) {
             AccountEditor(account: nil)
         }
@@ -186,6 +189,8 @@ struct OnboardingConnect: View {
                 flow.foundBills = nil
             } catch BankSyncError.cancelled {
                 // They closed Apple's sheet or Plaid.
+            } catch BankSyncError.needsPlan {
+                showsPaywall = true
             } catch {
                 connectError = error.localizedDescription
             }

@@ -26,6 +26,8 @@ struct SplitEditor: View {
     @State private var suggesting = false
     @State private var suggestionError: String?
     @State private var suggested = false
+    /// Suggesting from the receipt needs Suffice Plus or Hearth+; splitting by hand doesn't.
+    @State private var showsPaywall = false
     @FocusState private var focused: UUID?
 
     struct PartDraft: Identifiable, Equatable {
@@ -177,6 +179,7 @@ struct SplitEditor: View {
             if suggestsOnAppear { Task { await suggest() } }
         }
         .onChange(of: parts.dropFirst().map(\.text)) { keepRestCurrent() }
+        .hearthPaywall(isPresented: $showsPaywall, feature: ReceiptSplitter.paywallFeature)
         .sensoryFeedback(.success, trigger: remaining == 0) { _, balanced in balanced }
     }
 
@@ -274,6 +277,10 @@ struct SplitEditor: View {
 
     private func suggest() async {
         guard let receipt, !suggesting else { return }
+        guard HearthPurchases.shared.isUnlocked else {
+            showsPaywall = true
+            return
+        }
         suggesting = true
         suggestionError = nil
         defer { suggesting = false }
