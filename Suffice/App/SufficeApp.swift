@@ -70,6 +70,8 @@ struct SufficeApp: App {
         WindowGroup {
             AppRoot()
                 .background(KeyboardDismissal().frame(width: 0, height: 0))
+                // The Hearth launch splash.
+                .hearthSplash(.suffice, isEnabled: !ScreenshotMode.isOn)
                 .task { if !ScreenshotMode.isOn { await HearthAPI.shared.prepareSession() } }
                 .environment(router)
                 .environment(lock)

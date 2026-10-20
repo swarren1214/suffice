@@ -45,7 +45,7 @@ struct LoanDetailView: View {
                 NextPaymentCard(row: next, crossover: projection.rows.first { $0.principalCents > $0.interestCents }?.date)
 
                 SectionTitle("Each year’s payments")
-                YearlyChart(years: projection.years())
+                YearlyChart(years: projection.years(), startingBalanceCents: balance)
 
                 SectionTitle(title: "Schedule") {
                     Picker("Schedule", selection: $scheduleView) {
@@ -197,26 +197,44 @@ private struct SplitTile: View {
     }
 }
 
-/// Principal and interest paid each year, stacked.
+/// Principal and interest paid each year, stacked, with the balance as a line over them.
+/// Payments read on the leading axis and the balance on the trailing one; the balance is
+/// scaled to fit the payments' range so both share the plot.
 private struct YearlyChart: View {
     var years: [AmortizationYear]
+    /// Owed now, before the first payment in `years`. The top of the balance axis.
+    var startingBalanceCents: Int
 
     var body: some View {
+        let paymentTop = Self.paymentTop(years)
+        let balanceTop = Self.niceCeiling(Double(max(startingBalanceCents, 1)) / 100)
+        let balanceScale = paymentTop / balanceTop
+
         Card {
             Chart {
                 ForEach(years) { year in
-                    BarMark(x: .value("Year", String(year.year)), y: .value("Amount", Double(year.principalCents) / 100))
+                    BarMark(x: .value("Year", Self.date(year.year), unit: .year), y: .value("Amount", Double(year.principalCents) / 100))
                         .foregroundStyle(by: .value("Part", "Principal"))
-                    BarMark(x: .value("Year", String(year.year)), y: .value("Amount", Double(year.interestCents) / 100))
+                    BarMark(x: .value("Year", Self.date(year.year), unit: .year), y: .value("Amount", Double(year.interestCents) / 100))
                         .foregroundStyle(by: .value("Part", "Interest"))
                 }
+                ForEach(years) { year in
+                    LineMark(x: .value("Year", Self.date(year.year), unit: .year), y: .value("Amount", Double(year.balanceCents) / 100 * balanceScale))
+                        .foregroundStyle(by: .value("Part", "Balance"))
+                        .interpolationMethod(.catmullRom)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                }
             }
-            .chartForegroundStyleScale(["Principal": CategoryColor.green.color, "Interest": CategoryColor.orange.color])
+            .chartForegroundStyleScale([
+                "Principal": CategoryColor.green.color,
+                "Interest": CategoryColor.orange.color,
+                "Balance": Color.primary,
+            ])
+            .chartYScale(domain: 0...paymentTop)
             .chartLegend(position: .bottom, alignment: .leading)
             .chartXAxis {
-                // The first year, then every fifth.
-                AxisMarks(values: years.filter { $0.year % 5 == 0 || $0.year == years.first?.year }.map { String($0.year) }) { _ in
-                    AxisValueLabel()
+                AxisMarks(values: Self.labeledYears(years).map(Self.date)) { _ in
+                    AxisValueLabel(format: .dateTime.year(), centered: false)
                 }
             }
             .chartYAxis {
@@ -226,10 +244,43 @@ private struct YearlyChart: View {
                         if let dollars = value.as(Double.self) { Text(Money.compact(Int(dollars * 100))) }
                     }
                 }
+                // The balance, on the same gridless plot, scaled back to dollars.
+                AxisMarks(position: .trailing, values: [0, paymentTop / 2, paymentTop]) { value in
+                    AxisValueLabel {
+                        if let scaled = value.as(Double.self) {
+                            Text(Money.compact(Int((scaled / balanceScale * 100).rounded())))
+                        }
+                    }
+                }
             }
-            .frame(height: 190)
-            .accessibilityLabel("Principal and interest paid each year")
+            .frame(height: 210)
+            .accessibilityLabel("Principal and interest paid each year, and the balance left at the end of each year")
         }
+    }
+
+    /// Mid-year, so axis labels and the balance line sit centered on each year's bar.
+    private static func date(_ year: Int) -> Date {
+        Calendar.current.date(from: DateComponents(year: year, month: 7, day: 1)) ?? .now
+    }
+
+    /// Only some years get a label, so they don't collide: every year for short loans,
+    /// every other for medium ones, every fifth for long ones.
+    private static func labeledYears(_ years: [AmortizationYear]) -> [Int] {
+        let step = years.count > 12 ? 5 : (years.count > 6 ? 2 : 1)
+        return years.map(\.year).filter { $0 % step == 0 }
+    }
+
+    /// The largest year's payments with a little headroom, in dollars.
+    private static func paymentTop(_ years: [AmortizationYear]) -> Double {
+        let largest = years.map { Double($0.principalCents + $0.interestCents) / 100 }.max() ?? 0
+        return max(largest * 1.15, 1)
+    }
+
+    /// Rounds up to a tidy axis top: 349,134 → 350,000; 18,200 → 20,000.
+    private static func niceCeiling(_ value: Double) -> Double {
+        let magnitude = pow(10, floor(log10(value)))
+        let step = magnitude / 2
+        return (value / step).rounded(.up) * step
     }
 }
 

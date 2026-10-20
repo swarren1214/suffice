@@ -376,7 +376,7 @@ private struct ReceiptViewer: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close", systemImage: "xmark") { dismiss() }
+                    SheetCancelButton("Close") { dismiss() }
                 }
                 if let image {
                     ToolbarItem(placement: .primaryAction) {

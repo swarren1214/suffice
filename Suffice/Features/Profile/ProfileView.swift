@@ -56,6 +56,17 @@ struct ProfileView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 10)
 
+                ProfileAccount(me: me)
+
+                // Get Hearth+, or manage the plan.
+                HearthMembershipRow()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 54)
+                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
+
+                SufficeSyncCard()
+
                 VStack(spacing: 0) {
                     if myPerson != nil {
                         Button { editingMe = true } label: {
@@ -118,17 +129,6 @@ struct ProfileView: View {
                 }
                 .buttonStyle(.plain)
                 .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-
-                ProfileAccount(me: me)
-
-                // Get Hearth+, or manage the plan.
-                HearthMembershipRow()
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .frame(minHeight: 54)
-                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-
-                SufficeSyncCard()
 
                 NavigationLink { HearthAppsView(current: .suffice) } label: {
                     HStack(spacing: 12) {
