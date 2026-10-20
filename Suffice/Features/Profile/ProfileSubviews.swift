@@ -156,10 +156,24 @@ struct AboutView: View {
                     Label("Check Logos", systemImage: "photo.badge.checkmark")
                 }
             } footer: {
-                Text("Your budget lives on this iPhone and in your private iCloud. Suffice has no servers and can't see your data.")
+                Text("Your budget lives on your devices and in your private iCloud. Connecting a bank and signing in use Hearth’s server: bank accounts and transactions pass through it from Plaid to your devices, and it keeps the bank connection, not your budget.")
             }
             Section {
-                Text("Suffice is part of a family of apps with Sated and Hearken: simple tools for running a life, with your data kept in your own iCloud.")
+                Link(destination: URL(string: "https://hearthapps.com/privacy")!) {
+                    Label("Privacy Policy", systemImage: "hand.raised")
+                }
+                Link(destination: URL(string: "https://hearthapps.com/terms")!) {
+                    Label("Terms of Use", systemImage: "doc.text")
+                }
+                Link(destination: URL(string: "https://hearthapps.com/support")!) {
+                    Label("Help & Support", systemImage: "questionmark.circle")
+                }
+                Link(destination: URL(string: "mailto:support@hearthapps.com")!) {
+                    Label("Email support@hearthapps.com", systemImage: "envelope")
+                }
+            }
+            Section {
+                Text("Suffice is part of Hearth, a family of apps with BigTable, Sated, Caloma and Hearken: simple tools for running a home, with your data kept in your own iCloud.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

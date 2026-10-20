@@ -227,26 +227,52 @@ struct ProfileView: View {
 
 /// Profile › Account: the shared Hearth account section (HearthAccount.swift). Signed out, it
 /// offers Sign in with Apple (connecting a bank needs it; everything else works without it);
-/// signed in, it shows who and Sign Out, which signs out of every Hearth app on this device.
+/// signed in, it shows who and Sign Out, which signs out of every Hearth app on this device, and
+/// Delete Account, which deletes the Hearth account on the server, erases Suffice's data the way
+/// Erase App Data does, and signs out everywhere.
 private struct ProfileAccount: View {
     let me: Member?
+    @Environment(\.modelContext) private var context
     @AppStorage(SettingsKey.appleUserID) private var appleUserID = ""
+    @AppStorage(SettingsKey.onboarded) private var onboarded = true
     @State private var confirmsSignOut = false
+    @State private var confirmsDelete = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
+    @State private var cloud = HouseholdSync.shared
+    @State private var family = HearthHouseholdStore.shared
 
     private var profile: HearthAccountProfile? {
         guard !appleUserID.isEmpty else { return nil }
         return HearthAccountProfile(name: me?.name, email: HearthAccounts.session()?.email, photo: me?.photoData)
     }
 
+    /// Delete Account is only offered to someone signed in with Apple, never to the anonymous
+    /// session.
+    private var onDeleteAccount: (() -> Void)? {
+        guard !appleUserID.isEmpty else { return nil }
+        return { if !isDeleting { confirmsDelete = true } }
+    }
+
     var body: some View {
         HearthAccountSection(
             app: .suffice,
             profile: profile,
-            pitch: "Sign in to connect your bank accounts and use one account across Suffice, BigTable and Sated. Everything else works without it."
-        ) {
-            ProfileAppleButton()
-        } onSignOut: {
-            confirmsSignOut = true
+            pitch: "Sign in to connect your bank accounts and use one account across every Hearth app. Everything else works without it.",
+            signInButton: { ProfileAppleButton() },
+            onSignOut: { confirmsSignOut = true },
+            onDeleteAccount: onDeleteAccount
+        )
+        .alert("Delete Your Hearth Account?", isPresented: $confirmsDelete) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete Account", role: .destructive) { deleteAccount() }
+        } message: {
+            Text(deleteMessage)
+        }
+        .alert("Couldn't Delete Your Account", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deleteError ?? "")
         }
         .alert("Sign out of Suffice?", isPresented: $confirmsSignOut) {
             Button("Sign Out", role: .destructive) {
@@ -258,6 +284,50 @@ private struct ProfileAccount: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Your bank accounts stop updating until you sign in again, and you’re also signed out of your other Hearth apps on this \(DeviceName.current). Your budget stays on this \(DeviceName.current)\(AppConfig.cloudSyncEnabled ? " and in iCloud" : "").")
+        }
+    }
+
+    /// What Delete Account removes, matching what Erase App Data (or Leave Household) does here.
+    private var deleteMessage: String {
+        let account = "This permanently deletes your Hearth account for every Hearth app, with your bank connections, your BigTable and Hearken data, and your sign-in. Subscriptions bought through the App Store are managed in Settings › Apple Account › Subscriptions."
+        let here: String
+        if cloud.isMember {
+            here = "You’ll also leave your family’s household, which removes its budget from every Hearth app on this \(DeviceName.current)."
+        } else if cloud.isSharing {
+            here = "Every transaction, budget, bill, account and person is also removed from your devices, your iCloud and everyone you share the household with."
+        } else {
+            here = "Every transaction, budget, bill, account and person is also removed from this \(DeviceName.current)\(AppConfig.cloudSyncEnabled ? " and your iCloud" : "")."
+        }
+        return "\(account) \(here) You’ll be signed out of every Hearth app on this \(DeviceName.current). This can’t be undone."
+    }
+
+    /// Deletes the account on the server first; only when that worked, erases Suffice's data the
+    /// way Profile › Erase App Data does (the server already disconnected the banks, so no
+    /// per-bank calls are made with the deleted account) and signs out of every Hearth app.
+    private func deleteAccount() {
+        guard !isDeleting else { return }
+        isDeleting = true
+        Task {
+            defer { isDeleting = false }
+            do {
+                try await HearthAPI.shared.deleteAccount()
+            } catch let failure as HearthAPI.APIFailure where failure.code == "HOUSEHOLD_HAS_MEMBERS" {
+                deleteError = "Remove the other people from your household in BigTable first."
+                return
+            } catch {
+                deleteError = error.localizedDescription
+                return
+            }
+            let wasMember = cloud.isMember
+            if wasMember {
+                // Erasing would delete the family's budget for everyone; leaving clears this device.
+                await family.leave()
+            } else {
+                Ledger.eraseEverything(in: context)
+            }
+            await HearthAPI.shared.signOut()
+            withAnimation { appleUserID = "" }
+            if !wasMember { onboarded = false }
         }
     }
 }

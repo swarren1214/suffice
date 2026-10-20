@@ -2,15 +2,16 @@
 
 A native iPhone budget for a household: total cash across your accounts, every transaction
 with who made it, budgets with subcategories, and the bills. SwiftUI with Liquid Glass,
-SwiftData for the ledger, the household's own iCloud as the only backend. No accounts and no
-servers.
+SwiftData for the ledger. The budget lives on your devices and in your own iCloud (the Hearth
+container); bank connections and Sign in with Apple use Hearth's server (`hearth-api`), which
+keeps the Plaid access token and the account, never the budget. A Hearth account is optional.
 
 The screens follow the **MVP v2** designs on the "WeBudget iOS" Claude Design canvas (Welcome,
 Connect accounts, Overview, Activity, Transaction detail, Budget, New budget, Bills, Profile):
 the green gradient header with a white large title, the glass month capsule and glass
 action + avatar group in the toolbar, white 26 pt cards, red and green amount pills, merchant
 avatars with who-badges, budget rings, and the Liquid Glass tab bar with the separate search
-button. Suffice is the third app in the family with Sated and Hearken.
+button. Suffice is part of Hearth, with BigTable, Sated, Caloma and Hearken.
 
 Requires Xcode 26 and iOS 26. iPhone only.
 
@@ -21,10 +22,12 @@ Requires Xcode 26 and iOS 26. iPhone only.
    (the same team as Sated and Hearken). Automatic signing registers Sign in with Apple and
    iCloud the first time you build.
 3. If `com.stephenwarren.suffice` isn't available to your team, change the **Bundle
-   Identifier**, then update the iCloud container in `Suffice.entitlements` and
-   `AppConfig.cloudKitContainerID` to match.
+   Identifier**. The budget syncs in the shared Hearth container
+   (`iCloud.com.stephenwarren.hearth`, zone `Budget`) in `Suffice.entitlements`, which every
+   Hearth app uses; `iCloud.com.stephenwarren.suffice` is no longer used.
 4. Run. Onboarding is Welcome → Connect accounts → Who's budgeting. Signing in with Apple is
-   optional (it only fills in your name), so nothing is held behind a login. Previews load the
+   optional (it creates a Hearth account, needed only to connect a bank), so nothing else is
+   held behind a login. Previews load the
    household from the designs (`App/PreviewSupport.swift`).
 
 The first launch adds the budgets from the designs with no amounts: Home (Mortgage, Home
@@ -209,10 +212,11 @@ The SwiftData store is local (`cloudKitDatabase: .none`). `HouseholdSync`
 (Services/Household) carries it to iCloud with **CKSyncEngine**, because SwiftData's own
 CloudKit sync can't share data with a second Apple Account.
 
-- **Zone:** everything lives in a record zone named `Household`. The owner keeps it in their
-  private database and shares the whole zone (`CKShare(recordZoneID:)`); a member who accepts
-  sees it in their shared database. Both read and write it, and each person's own devices sync
-  the same way.
+- **Zone:** everything lives in the app zone `Budget` in the Hearth container
+  (`iCloud.com.stephenwarren.hearth`), synced on the Hearth household's engines and shared with
+  the household's parents and adults through the household's one invitation
+  (`HearthAppSharing`; see AGENT.md › Hearth household). A member sees it in their shared
+  database. Both read and write it, and each person's own devices sync the same way.
 - **Records:** one per model, named `<Type>.<uuid>` (`SyncRecords.swift`). Every field is in
   `encryptedValues`; member photos are assets.
 - **Sending:** SwiftData history (each model's `id` is `.preserveValueOnDeletion`, so deletions
@@ -239,9 +243,9 @@ CloudKit sync can't share data with a second Apple Account.
 
 ## Next up
 
-- Bank transactions through Plaid with a tiny serverless relay (Plaid requires the secret
-  off-device), and Apple Card / Apple Cash through FinanceKit once Apple approves it. Imports
-  land in Activity › New; payee rules file them.
+- Apple Card / Apple Cash through FinanceKit once Apple approves it. Imports land in
+  Activity › New; payee rules file them. (Bank transactions through Plaid are done; see
+  Shared API identity and bank sync.)
 - Location on new transactions (for the map), and receipts.
 - Roll-over of unspent amounts, per-month amount changes.
 - Widgets, App Intents ("I spent $40 at Costco") and bill reminders.
@@ -386,6 +390,11 @@ Banks connect through Plaid (`Services/BankSync/`, LinkKit 7 via Swift Package M
 - **When:** after connecting, on pull to refresh on Overview, and on opening the app when it's
   been an hour. Profile › Connected accounts lists banks with Sync, Sign In (when the bank
   needs it; Plaid update mode) and Disconnect. Erase App Data disconnects banks first.
+- **Delete Account:** Profile › Account › Delete Account (only when signed in with Apple)
+  calls `DELETE /v1/me`, which deletes the Hearth account for every app and removes its Plaid
+  items on the server; then Suffice erases its data as Erase App Data does (Leave Household
+  for a member) and signs out of every Hearth app. On failure the account is kept and the
+  error is shown (`HOUSEHOLD_HAS_MEMBERS`: remove the others from the BigTable household first).
 - **Logos:** Plaid's merchant logo when there is one, otherwise Logo.dev by the merchant's
   domain straight from its CDN (`AppConfig.logoDevPublishableKey`, a publishable `pk_` key);
   initials otherwise.

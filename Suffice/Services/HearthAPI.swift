@@ -150,6 +150,14 @@ actor HearthAPI {
         return try JSONDecoder().decode(Identity.self, from: data)
     }
 
+    /// Deletes the person's whole Hearth account on the API (`DELETE /v1/me`), for every Hearth
+    /// app: bank connections, BigTable and Hearken data, purchases record and sign-in. Throws
+    /// `APIFailure` (code `HOUSEHOLD_HAS_MEMBERS` while they still manage a BigTable household
+    /// with other people in it), and the account is kept when it fails.
+    func deleteAccount() async throws {
+        _ = try await authorizedData(path: "/v1/me", method: "DELETE")
+    }
+
     func createPlaidLinkToken() async throws -> Data {
         try await authorizedData(path: "/v1/banking/link-token", method: "POST", body: Data("{}".utf8))
     }
