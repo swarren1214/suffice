@@ -26,6 +26,7 @@ struct AskSettingsView: View {
                         Text("\(option.name) (\(option.seconds.formatted()) s)").tag(option.seconds)
                     }
                 }
+                .tint(.primary)
                 Toggle("Spoken Replies", isOn: $spokenReplies)
                 if spokenReplies {
                     NaturalVoiceRow(model: model)
@@ -35,6 +36,7 @@ struct AskSettingsView: View {
                                 Text("\(option.name) · \(option.detail)").tag(option.id)
                             }
                         }
+                        .tint(.primary)
                     }
                     Button(speaker.isActive ? "Stop" : "Play Sample", systemImage: speaker.isActive ? "stop.fill" : "play.fill") {
                         if speaker.isActive {
@@ -43,6 +45,7 @@ struct AskSettingsView: View {
                             speaker.speak("Hi, I'm Suffice. You have $18.60 left for Dining Out, with 18 days to go.")
                         }
                     }
+                    .tint(.primary)
                 }
             } header: {
                 Text("Talking to Suffice")
@@ -75,7 +78,7 @@ private struct NaturalVoiceRow: View {
                 model.download()
             } label: {
                 LabeledContent("Natural Voice") {
-                    Text("Download \(KokoroModel.approximateSize)").foregroundStyle(Brand.green)
+                    Text("Download \(KokoroModel.approximateSize)").foregroundStyle(.primary)
                 }
             }
             .foregroundStyle(.primary)
@@ -83,6 +86,7 @@ private struct NaturalVoiceRow: View {
             VStack(alignment: .leading, spacing: 8) {
                 LabeledContent("Natural Voice") {
                     Button("Cancel") { model.cancelDownload() }
+                        .tint(.primary)
                 }
                 ProgressView(value: fraction).tint(Brand.green)
             }
@@ -98,6 +102,7 @@ private struct NaturalVoiceRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 LabeledContent("Natural Voice") {
                     Button("Try Again") { model.download() }
+                        .tint(.primary)
                 }
                 Text(message).font(.footnote).foregroundStyle(.secondary)
             }

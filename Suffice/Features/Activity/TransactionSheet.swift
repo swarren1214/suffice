@@ -109,14 +109,14 @@ struct TransactionSheet: View {
                         } label: {
                             Label {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Split Across Budgets").foregroundStyle(Brand.green)
+                                    Text("Split Across Budgets").foregroundStyle(.primary)
                                     Text("One charge, several budgets")
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
                                 }
                             } icon: {
                                 Image(systemName: "arrow.triangle.branch")
-                                    .foregroundStyle(Brand.green)
+                                    .foregroundStyle(.primary)
                             }
                         }
                         .disabled(draft.amountCents <= 0)
@@ -370,12 +370,12 @@ struct TransactionSheet: View {
                 }
             } icon: {
                 Image(systemName: "envelope.fill")
-                    .foregroundStyle(Brand.green)
+                    .foregroundStyle(.secondary)
             }
             if let link = URL(string: entry.receiptLink), link.scheme == "https" {
                 Link(destination: link) {
                     Label("Open the Email", systemImage: "arrow.up.right.square")
-                        .foregroundStyle(Brand.green)
+                        .foregroundStyle(.primary)
                 }
             }
             Button("Remove Receipt", role: .destructive) {
@@ -481,7 +481,7 @@ struct TransactionSheet: View {
             NavigationLink {
                 splitEditor(suggests: false)
             } label: {
-                Text("Edit Split").foregroundStyle(Brand.green)
+                Text("Edit Split").foregroundStyle(.primary)
             }
         }
     }
@@ -489,14 +489,14 @@ struct TransactionSheet: View {
     private var splitFromReceiptLabel: some View {
         Label {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Split From This Receipt").foregroundStyle(Brand.green)
+                Text("Split From This Receipt").foregroundStyle(.primary)
                 Text("Reads the items on your \(DeviceName.current) and suggests budgets")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
         } icon: {
             Image(systemName: "sparkles")
-                .foregroundStyle(Brand.green)
+                .foregroundStyle(.primary)
         }
     }
 

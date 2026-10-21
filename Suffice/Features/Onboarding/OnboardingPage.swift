@@ -121,6 +121,7 @@ struct OnboardingSecondaryButton: View {
         }
         .buttonStyle(.glass)
         .controlSize(.large)
+        .tint(.primary)
     }
 }
 

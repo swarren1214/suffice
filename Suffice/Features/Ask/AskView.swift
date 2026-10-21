@@ -88,6 +88,8 @@ struct AskView: View {
                     }
                     .accessibilityLabel(spokenReplies ? "Spoken replies on" : "Spoken replies off")
                     .accessibilityHint(spokenReplies ? "Turns off spoken replies" : "Turns on spoken replies")
+                    // Not a confirm button: the text color, not the app's (AGENT.md).
+                    .tint(.primary)
                 }
                 if !engine.messages.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -96,6 +98,8 @@ struct AskView: View {
                             withAnimation(.snappy) { engine.reset() }
                             refresh()
                         }
+                        // Not a confirm button: the text color, not the app's (AGENT.md).
+                        .tint(.primary)
                     }
                 }
             }
@@ -149,7 +153,7 @@ struct AskView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Label("On-device", systemImage: "lock")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Brand.green)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 12)
                     .frame(minHeight: 30)
                     .background(Brand.green.opacity(0.1), in: .capsule)
@@ -289,7 +293,7 @@ private struct VoiceStatus: View {
         case .downloading(let fraction):
             HStack(spacing: 10) {
                 Image(systemName: "waveform")
-                    .foregroundStyle(Brand.green)
+                    .foregroundStyle(Brand.secondaryText)
                 Text(fraction > 0 ? "Getting Suffice’s voice… \(Int(fraction * 100))%" : "Suffice’s voice downloads on Wi-Fi (\(KokoroModel.approximateSize))")
                     .font(.footnote)
                     .foregroundStyle(Brand.secondaryText)
@@ -305,7 +309,7 @@ private struct VoiceStatus: View {
                         model.download()
                     }
                     .font(.footnote.weight(.semibold))
-                    .tint(Brand.green)
+                    .tint(.primary)
                 }
             }
             .padding(.horizontal, 16)
@@ -323,7 +327,7 @@ private struct VoiceStatus: View {
                 Spacer(minLength: 0)
                 Button("Try Again") { model.download() }
                     .font(.footnote.weight(.semibold))
-                    .tint(Brand.green)
+                    .tint(.primary)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)

@@ -85,7 +85,7 @@ struct NetWorthView: View {
                         Image(systemName: "chevron.right").font(.caption.weight(.bold))
                     }
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Brand.green)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 14)
                     .frame(minHeight: 34)
                     .background(Brand.green.opacity(0.12), in: .capsule)

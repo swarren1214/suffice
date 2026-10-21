@@ -368,7 +368,7 @@ private struct BillRow: View {
                         Image(systemName: "arrow.up.right").font(.caption.weight(.bold))
                     }
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Brand.green)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 12)
                     .frame(minHeight: 34)
                     .background(Brand.green.opacity(0.12), in: .capsule)

@@ -87,7 +87,7 @@ struct ReceiptSection: View {
                 Button { request(.library) } label: {
                     Label("Upload", systemImage: "square.and.arrow.up")
                         .fontWeight(.semibold)
-                        .foregroundStyle(Brand.green)
+                        .foregroundStyle(.primary)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
@@ -381,6 +381,8 @@ private struct ReceiptViewer: View {
                 if let image {
                     ToolbarItem(placement: .primaryAction) {
                         ShareLink(item: Image(uiImage: image), preview: SharePreview("Receipt", image: Image(uiImage: image)))
+                            // Not a confirm button: the text color, not the app's (AGENT.md).
+                            .tint(.primary)
                     }
                 }
             }

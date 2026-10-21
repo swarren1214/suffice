@@ -322,7 +322,7 @@ struct EmailReceiptsView: View {
                             withAnimation(.snappy) { showsAllAttached.toggle() }
                         }
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Brand.green)
+                        .foregroundStyle(.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 16)
                         .frame(minHeight: 50)

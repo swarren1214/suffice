@@ -24,6 +24,7 @@ struct LogoCheckView: View {
                     Task { await run() }
                 }
                 .disabled(isRunning)
+                .tint(.primary)
             } footer: {
                 Text("Tests Logo.dev and the logos saved on your transactions. Screenshot the results if logos aren't showing.")
             }

@@ -85,7 +85,7 @@ private struct BudgetAnswerCard: View {
             Button(action: onOpen) {
                 Text("Open \(category.name)")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Brand.green)
+                    .foregroundStyle(.primary)
                     .padding(.horizontal, 16)
                     .frame(minHeight: 40)
                     .background(cardFill, in: .capsule)
@@ -179,7 +179,7 @@ private struct TransferCard: View {
                     Button { onTransfer(false) } label: {
                         Text("Not now")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Brand.green)
+                            .foregroundStyle(.primary)
                             .padding(.horizontal, 16)
                             .frame(minHeight: 40)
                             .background(cardFill, in: .capsule)

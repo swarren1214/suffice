@@ -60,7 +60,7 @@ struct VoiceTopBar: View {
             Spacer()
             Label("On this \(DeviceName.current)", systemImage: "lock")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Brand.green)
+                .foregroundStyle(.primary)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 36)
                 .glassEffect(.regular, in: .capsule)
@@ -84,7 +84,7 @@ struct LiveTranscript: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(heading)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isListening ? AnyShapeStyle(Brand.green) : AnyShapeStyle(.secondary))
+                .foregroundStyle(isListening ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
             if text.isEmpty {
                 Text(placeholder)
                     .foregroundStyle(.secondary)

@@ -399,6 +399,7 @@ private struct AccountDetail: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+                .tint(.primary)
                 Divider().padding(.leading, 60)
                 Button(action: edit) {
                     HStack(spacing: 12) {

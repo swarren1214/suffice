@@ -97,7 +97,7 @@ struct SplitEditor: View {
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(suggested ? "Suggest Again" : "Suggest From Receipt")
-                                    .foregroundStyle(ReceiptSplitter.isAvailable ? Brand.green : .secondary)
+                                    .foregroundStyle(ReceiptSplitter.isAvailable ? Color.primary : .secondary)
                                 Text(suggesting ? "Reading the receipt…" : "Reads the items on your \(DeviceName.current)")
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
@@ -155,7 +155,7 @@ struct SplitEditor: View {
             Section {
                 Button { addPart() } label: {
                     Label("Add a Part", systemImage: "plus.circle.fill")
-                        .foregroundStyle(Brand.green)
+                        .foregroundStyle(.primary)
                 }
             } footer: {
                 Text(missingBudget

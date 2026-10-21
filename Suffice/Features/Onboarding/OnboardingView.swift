@@ -331,7 +331,7 @@ struct OnboardingAddLink: View {
         Button(action: action) {
             Label(title, systemImage: "plus.circle.fill")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(OnboardingStyle.accent)
+                .foregroundStyle(.primary)
                 .padding(.horizontal, 6)
                 .frame(minHeight: 44)
         }

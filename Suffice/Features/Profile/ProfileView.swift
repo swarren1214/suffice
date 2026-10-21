@@ -426,6 +426,7 @@ private struct CloudSyncView: View {
                     }
                 }
                 .disabled(isSeeding)
+                .tint(.primary)
                 if let seedResult {
                     Text(seedResult)
                         .font(.footnote)

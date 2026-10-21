@@ -189,7 +189,7 @@ struct AskVoiceView: View {
                         .frame(minHeight: 36)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Brand.green)
+                .foregroundStyle(.primary)
                 .background(Brand.green.opacity(0.15), in: .capsule)
             }
         case .failed(let message):
@@ -201,7 +201,7 @@ struct AskVoiceView: View {
     private func answer(_ reply: AskMessage, earlier: Bool) -> some View {
         Label("Suffice", systemImage: "sparkles")
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(Brand.green)
+            .foregroundStyle(.secondary)
         Text(AskFormatting.attributed(earlier ? "Last time: " + reply.text : reply.text))
             .font(.body)
             .foregroundStyle(earlier ? .secondary : .primary)
@@ -225,7 +225,7 @@ struct AskVoiceView: View {
             } label: {
                 Label("Get Suffice’s natural voice (\(KokoroModel.approximateSize), runs on this \(DeviceName.current))", systemImage: "arrow.down.circle")
                     .font(.footnote.weight(.medium))
-                    .foregroundStyle(Brand.green)
+                    .foregroundStyle(.primary)
             }
             .buttonStyle(.plain)
         case .downloading(let fraction):

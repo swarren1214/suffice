@@ -86,7 +86,7 @@ struct LoansSection: View {
                             Image(systemName: "chevron.right").font(.caption.weight(.bold))
                         }
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Brand.green)
+                        .foregroundStyle(.primary)
                         .padding(.horizontal, 14)
                         .frame(minHeight: 34)
                         .background(Brand.green.opacity(0.12), in: .capsule)
@@ -101,7 +101,7 @@ struct LoansSection: View {
                     } trailing: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
-                            .foregroundStyle(Brand.green)
+                            .foregroundStyle(.primary)
                     }
                     .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
                 }

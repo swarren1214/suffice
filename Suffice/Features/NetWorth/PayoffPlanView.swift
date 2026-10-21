@@ -67,7 +67,7 @@ struct PayoffPlanView: View {
                                     withAnimation(.snappy) { extra = amount }
                                 }
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(extra == amount ? .white : Brand.green)
+                                .foregroundStyle(extra == amount ? Color.white : Color.primary)
                                 .padding(.horizontal, 14)
                                 .frame(minHeight: 34)
                                 .background(extra == amount ? Brand.green : Brand.green.opacity(0.12), in: .capsule)
@@ -107,6 +107,7 @@ struct PayoffPlanView: View {
                                 Spacer(minLength: 8)
                                 Button("Use My Rate") { withAnimation(.snappy) { rate = loan.annualRate } }
                                     .font(.footnote.weight(.semibold))
+                                    .tint(.primary)
                             }
                         }
                     }
@@ -167,6 +168,7 @@ struct PayoffPlanView: View {
                 }
                 .buttonStyle(.glass)
                 .controlSize(.large)
+                .tint(.primary)
                 .disabled(options.extraMonthlyCents == 0)
                 .sensoryFeedback(.success, trigger: addedBill) { _, new in new }
             }
@@ -189,7 +191,7 @@ struct PayoffPlanView: View {
             Spacer()
             Text(value)
                 .fontWeight(.semibold)
-                .foregroundStyle(Brand.green)
+                .foregroundStyle(.primary)
                 .monospacedDigit()
                 .contentTransition(.numericText())
         }

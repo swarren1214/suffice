@@ -40,9 +40,11 @@ struct AccountsListView: View {
                             } else if bank.needsReconnect {
                                 Button("Sign In") { run(bank) { try await BankSync.reconnect(bank, memberID: memberID, in: context) } }
                                     .buttonStyle(.glass)
+                                    .tint(.primary)
                             } else {
                                 Button("Sync", systemImage: "arrow.clockwise") { run(bank) { try await BankSync.sync(bank, memberID: memberID, in: context) } }
                                     .labelStyle(.iconOnly)
+                                    .tint(.primary)
                             }
                         }
                         .swipeActions {
@@ -83,6 +85,7 @@ struct AccountsListView: View {
                     .tint(.primary)
                 }
                 Button("Add Account", systemImage: "plus") { showsConnect = true }
+                    .tint(.primary)
             }
         }
         .navigationTitle("Connected accounts")
@@ -178,6 +181,9 @@ struct AboutView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        // Rows and links in the text color, icons too: not the app's green tint that list
+        // buttons and links get.
+        .tint(.primary)
         .navigationTitle("About Suffice")
         .onAppear { csv = Ledger.csv(in: context) }
     }

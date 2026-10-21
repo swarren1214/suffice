@@ -83,7 +83,7 @@ struct BillSheet: View {
                     } label: {
                         LabeledContent("Pay at") {
                             Text(bill.payHost ?? "Add where it’s paid")
-                                .foregroundStyle(bill.payHost == nil ? Brand.green : .secondary)
+                                .foregroundStyle(bill.payHost == nil ? Color.primary : .secondary)
                         }
                     }
                     .foregroundStyle(.primary)
@@ -104,13 +104,13 @@ struct BillSheet: View {
                         scanRequest = UIImagePickerController.isSourceTypeAvailable(.camera) ? .camera : .library
                     } label: {
                         Label("Scan a Paper Bill", systemImage: "doc.viewfinder")
-                            .foregroundStyle(Brand.green)
+                            .foregroundStyle(.primary)
                     }
                     Button {
                         picksFile = true
                     } label: {
                         Label("Add a Bill PDF", systemImage: "doc.badge.plus")
-                            .foregroundStyle(Brand.green)
+                            .foregroundStyle(.primary)
                     }
                 } footer: {
                     Text("Suffice reads the amount, due date and charges on your \(DeviceName.current). You can also share a bill to Suffice from Mail or Files, and with email connected new bills come in on their own.")
@@ -125,6 +125,7 @@ struct BillSheet: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Edit") { editing = true }
+                        .tint(.primary)
                 }
             }
             .refreshable { await HouseholdSync.shared.syncNow() }
@@ -361,7 +362,7 @@ struct BillReadSheet: View {
                     .pickerStyle(.navigationLink)
                     if billID == nil {
                         Button("Add It as a New Bill") { addsBill = true }
-                            .foregroundStyle(Brand.green)
+                            .foregroundStyle(.primary)
                     }
                     LabeledContent("Amount due") {
                         TextField(Money.text(0), text: $amountText)
@@ -616,6 +617,8 @@ struct StatementDocumentView: View {
                 if let data = statement.documentData {
                     ToolbarItem(placement: .primaryAction) {
                         ShareLink(item: StatementFile(data: data, type: statement.documentType, name: statement.fileName), preview: SharePreview(statement.fileName.isEmpty ? "Bill" : statement.fileName))
+                            // Not a confirm button: the text color, not the app's (AGENT.md).
+                            .tint(.primary)
                     }
                 }
             }

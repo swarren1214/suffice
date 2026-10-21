@@ -20,6 +20,7 @@ struct RemindersView: View {
                             UIApplication.shared.open(url)
                         }
                     }
+                    .tint(.primary)
                 } footer: {
                     Text("Notifications are off for Suffice, so these reminders can’t appear.")
                 }

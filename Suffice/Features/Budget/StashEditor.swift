@@ -332,7 +332,7 @@ struct StashEditor: View {
                     Button("Mark Stashed") {
                         StashScheduler.markStashed(stash, in: context)
                     }
-                    .foregroundStyle(Brand.green)
+                    .foregroundStyle(.primary)
                 }
             }
             if !stash.repeatsYearly, summary.status == .due || summary.status == .funded {
@@ -341,7 +341,7 @@ struct StashEditor: View {
                     try? context.save()
                     dismiss()
                 }
-                .foregroundStyle(Brand.green)
+                .foregroundStyle(.primary)
             }
             Button("Delete Stash", role: .destructive) { confirmsDelete = true }
                 .foregroundStyle(Brand.expenseInk)

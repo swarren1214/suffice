@@ -139,6 +139,8 @@ struct BudgetSheet: View {
                         Button("Back", systemImage: "chevron.left") {
                             withAnimation(.snappy) { isEditing = false }
                         }
+                        // Not a confirm button: the text color, not the app's (AGENT.md).
+                        .tint(.primary)
                     } else {
                         SheetCancelButton("Close") { dismiss() }
                     }
@@ -148,6 +150,8 @@ struct BudgetSheet: View {
                         Button("Edit", systemImage: "pencil") {
                             withAnimation(.snappy) { isEditing = true }
                         }
+                        // Not a confirm button: the text color, not the app's (AGENT.md).
+                        .tint(.primary)
                     }
                     ToolbarSpacer(.fixed, placement: .primaryAction)
                 }
@@ -578,6 +582,7 @@ struct BudgetSheet: View {
                     .padding(.vertical, 5)
                     .background(Color(.systemGray5), in: .capsule)
             }
+            .tint(.primary)
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 52)
@@ -654,7 +659,7 @@ struct BudgetSheet: View {
                             .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Brand.green)
+                    .foregroundStyle(.primary)
                 }
             }
             if !subDrafts.isEmpty {
