@@ -167,8 +167,6 @@ struct ProfileButton: View {
     @AppStorage(SettingsKey.currentMember) private var currentMember = ""
 
     var body: some View {
-        // Redraw when another Hearth app shares a photo (used when you have none here).
-        let _ = HearthPhotos.shared.generation
         NavigationLink {
             ProfileView()
         } label: {

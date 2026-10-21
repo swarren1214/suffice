@@ -244,7 +244,7 @@ private struct ProfileAccount: View {
 
     private var profile: HearthAccountProfile? {
         guard !appleUserID.isEmpty else { return nil }
-        return HearthAccountProfile(name: me?.name, email: HearthAccounts.session()?.email, photo: me?.photoData)
+        return HearthAccountProfile(name: me?.name, email: HearthAccounts.session()?.email, photo: me.flatMap { SufficeHearthHousehold.photo(forMemberID: $0.id) })
     }
 
     /// Delete Account is only offered to someone signed in with Apple, never to the anonymous

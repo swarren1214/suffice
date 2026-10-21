@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import UIKit
 
 /// Keeps Suffice's budgeting people (`Member`) in step with the Hearth household. Suffice always
 /// has a household (a household of one is fine), and people are added and edited only there.
@@ -20,6 +21,25 @@ enum SufficeHearthHousehold {
     static func person(for member: Member) -> HearthMember? {
         HearthHouseholdStore.shared.member(app: .suffice, appID: member.id.uuidString)
     }
+
+    /// A Suffice member's photo: the one set on their household person, and only that one.
+    /// Every avatar in Suffice draws from here, so it always matches the household.
+    static func photo(forMemberID id: UUID) -> Data? {
+        guard let name = HearthHouseholdStore.shared.member(app: .suffice, appID: id.uuidString)?.photo else { return nil }
+        return Hearth.photo(named: name)
+    }
+
+    /// The decoded household photo for a Suffice member. Photo file names change with the photo,
+    /// so they're safe cache keys.
+    static func image(forMemberID id: UUID) -> UIImage? {
+        guard let name = HearthHouseholdStore.shared.member(app: .suffice, appID: id.uuidString)?.photo else { return nil }
+        if let cached = imageCache.object(forKey: name as NSString) { return cached }
+        guard let data = Hearth.photo(named: name), let image = UIImage(data: data) else { return nil }
+        imageCache.setObject(image, forKey: name as NSString)
+        return image
+    }
+
+    private static let imageCache = NSCache<NSString, UIImage>()
 
     /// The Suffice member for a household person, among `members`.
     static func member(for person: HearthMember, among members: [Member]) -> Member? {

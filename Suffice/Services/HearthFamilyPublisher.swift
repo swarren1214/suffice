@@ -5,11 +5,10 @@ import UIKit
 
 /// Suffice's side of sharing people with the other Hearth apps on this device (see
 /// `Services/Hearth/HearthShared.swift`): it publishes the household (names, colors, photos, and
-/// who "This is me" is) so BigTable, Caloma and Hearken can show Suffice's photos, and it keeps
-/// `HearthPhotos` fresh for people who have a photo in another app but not here.
+/// who "This is me" is). Photos are each person's Hearth household photo.
 enum HearthHousehold {
     private static var pending: Task<Void, Never>?
-    private static var changeObserver: NSObjectProtocol?
+    private static var started = false
 
     /// The shared file written for each member's photo, and the photo it was made from, so
     /// publishing again (after every save) doesn't re-encode photos that haven't changed.
@@ -32,13 +31,11 @@ enum HearthHousehold {
     /// The photo files kept last time, so old ones are cleaned up only when something changed.
     private static var keptPhotoFiles: Set<String>?
 
-    /// Publishes now and follows the other apps' changes while Suffice is open. Call once.
+    /// Publishes now and listens for the other apps' changes while Suffice is open. Call once.
     static func start(_ container: ModelContainer) {
-        guard changeObserver == nil, !ScreenshotMode.isOn else { return }
+        guard !started, !ScreenshotMode.isOn else { return }
+        started = true
         Hearth.startObservingChanges()
-        changeObserver = NotificationCenter.default.addObserver(forName: Hearth.didChange, object: nil, queue: .main) { _ in
-            Task { @MainActor in HearthPhotos.shared.reset() }
-        }
         publish(in: container.mainContext)
     }
 
@@ -90,10 +87,10 @@ enum HearthHousehold {
         sharedPhotoFiles = sharedPhotoFiles.filter { ids.contains($0.key) }
     }
 
-    /// The member's photo in the shared folder (a square JPEG of at most 400 px, from
+    /// The member's household photo in the shared folder (a square JPEG of at most 400 px, from
     /// `MemberPhoto.prepare`), and whether it was written just now.
     private static func sharedPhoto(for member: Member) -> (file: String?, changed: Bool) {
-        guard let data = member.photoData else {
+        guard let data = SufficeHearthHousehold.photo(forMemberID: member.id) else {
             sharedPhotoFiles[member.id] = nil
             return (nil, false)
         }
@@ -122,37 +119,5 @@ enum HearthHousehold {
         case .pink: 0xA3245A
         case .teal: 0x0F6E69
         }
-    }
-}
-
-/// Photos the other Hearth apps have of people who don't have one in Suffice (Caloma's photo of
-/// your partner, BigTable's of you), by name. Each name is read from the shared folder once and
-/// kept until another app shares something (`Hearth.didChange`), so drawing an avatar never
-/// touches the disk.
-@MainActor
-@Observable
-final class HearthPhotos {
-    static let shared = HearthPhotos()
-
-    /// Bumped when the cache is cleared, so avatars that showed a shared photo redraw.
-    private(set) var generation = 0
-    /// By normalized name; a nil image means there's no shared photo for that name.
-    @ObservationIgnored private var images: [String: UIImage?] = [:]
-
-    func image(forName name: String) -> UIImage? {
-        _ = generation
-        guard !ScreenshotMode.isOn else { return nil }
-        let key = HearthNames.normalized(name)
-        guard !key.isEmpty else { return nil }
-        if let cached = images[key] { return cached }
-        let image = Hearth.sharedPhoto(forName: name, excluding: .suffice).flatMap { UIImage(data: $0) }
-        images.updateValue(image, forKey: key)
-        return image
-    }
-
-    func reset() {
-        guard !images.isEmpty else { return }
-        images = [:]
-        generation += 1
     }
 }

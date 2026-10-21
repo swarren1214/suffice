@@ -400,11 +400,18 @@ struct HearthAccountRow: View {
 
 // MARK: - Avatar
 
-/// The signed-in person's photo, another Hearth app's photo of them, or their initial.
+/// The signed-in person's photo: the one set on them in the Hearth household when there is one,
+/// otherwise the app's own photo, another Hearth app's photo of them, or their initial.
 struct HearthAccountAvatar: View {
     let app: HearthApp
     let profile: HearthAccountProfile
     var size: CGFloat = 60
+
+    /// "Me" in the household: every Hearth app shows this same photo.
+    private var householdImage: UIImage? {
+        guard let name = HearthHouseholdStore.shared.me?.photo else { return nil }
+        return Hearth.photo(named: name).flatMap(UIImage.init(data:))
+    }
 
     private var ownImage: UIImage? {
         profile.photo.flatMap(UIImage.init(data:))
@@ -418,7 +425,7 @@ struct HearthAccountAvatar: View {
 
     var body: some View {
         Group {
-            if let image = ownImage {
+            if let image = householdImage ?? ownImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()

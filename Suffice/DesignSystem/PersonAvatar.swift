@@ -2,18 +2,34 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
-/// A person's round avatar: their photo when they have one, otherwise a photo another Hearth
-/// app has of someone with their name (`HearthPhotos`), otherwise their initial on their pale
-/// color. Used everywhere a household member appears.
+/// A person's round avatar: a member's photo from the Hearth household (the one photo set for
+/// them there), otherwise their initial on their pale color. Used everywhere a household member
+/// appears, so every avatar of someone shows the same photo.
 struct PersonAvatar: View {
     var name: String
     var color: MemberColor
+    /// A photo to show directly, for a pick that isn't saved to the household yet.
     var photo: Data?
+    /// The Suffice member this is; their photo comes from their household person.
+    var memberID: UUID?
     var size: CGFloat = 30
+
+    init(name: String, color: MemberColor, photo: Data?, size: CGFloat = 30) {
+        self.name = name
+        self.color = color
+        self.photo = photo
+        self.memberID = nil
+        self.size = size
+    }
+
+    private var image: UIImage? {
+        if let memberID { return SufficeHearthHousehold.image(forMemberID: memberID) }
+        return MemberPhoto.image(from: photo)
+    }
 
     var body: some View {
         Group {
-            if let image = MemberPhoto.image(from: photo) ?? (photo == nil ? HearthPhotos.shared.image(forName: name) : nil) {
+            if let image {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -31,8 +47,10 @@ struct PersonAvatar: View {
 }
 
 extension PersonAvatar {
+    /// A household member: their photo is always the one set on their Hearth household person.
     init(member: Member, size: CGFloat = 30) {
-        self.init(name: member.name, color: member.color, photo: member.photoData, size: size)
+        self.init(name: member.name, color: member.color, photo: nil, size: size)
+        self.memberID = member.id
     }
 }
 
