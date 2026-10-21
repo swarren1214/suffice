@@ -223,7 +223,7 @@ struct EmailConnectView: View {
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             // Closed the sheet: nothing to say.
         } catch {
-            problem = error.localizedDescription
+            problem = FriendlyError.message(for: error, fallback: "Your email couldn’t be connected just now. Try again in a moment.")
         }
     }
 }

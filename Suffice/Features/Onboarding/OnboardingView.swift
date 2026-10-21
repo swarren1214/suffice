@@ -2,8 +2,10 @@ import AuthenticationServices
 import SwiftData
 import SwiftUI
 
-/// First run, from the "Suffice Onboarding & Tour" designs: Welcome, then the steps that end
-/// with a real plan (your household, accounts, the month's plan, bills, reminders) and All set.
+/// First run, from the "Suffice Onboarding & Tour" designs and the Hearth Onboarding canvas:
+/// Welcome (optional Sign in with Apple), then the steps that end with a real plan (your
+/// household, accounts, the month's plan, bills, reminders), All set, and Better with Hearth
+/// (the other Hearth apps), which starts the tour or jumps in.
 ///
 /// The household step is the Hearth household's (`HearthHouseholdOnboarding`): set one up (a
 /// household of one is fine) or join the family's with their invitation. Joining shares the
@@ -38,8 +40,11 @@ struct OnboardingView: View {
         case .plan: OnboardingPlan()
         case .bills: OnboardingBills()
         case .alerts: OnboardingAlerts()
-        case .ready: OnboardingReady { tour in
-            UserDefaults.standard.set(tour, forKey: SettingsKey.wantsTour)
+        case .ready: OnboardingReady { flow.next() }
+        // The last page: the other Hearth apps (HearthOnboarding.swift). Show Me Around starts
+        // the tour at its first step once the tabs are up; the tour's own Welcome never shows.
+        case .apps: HearthOnboardingAppsPage(app: .suffice) { tour in
+            HearthOnboarding.finish(.suffice, tour: tour)
             AppRouter.shared.tab = .overview
             onboarded = true
         }
@@ -51,7 +56,7 @@ struct OnboardingView: View {
 @Observable
 final class OnboardingFlow {
     enum Screen: Hashable {
-        case welcome, household, connect, plan, bills, alerts, ready
+        case welcome, household, connect, plan, bills, alerts, ready, apps
     }
 
     private(set) var screen: Screen = .welcome
@@ -86,7 +91,8 @@ final class OnboardingFlow {
         switch screen {
         case .welcome: go(to: .household)
         case .alerts: go(to: .ready)
-        case .ready: break
+        case .ready: go(to: .apps)
+        case .apps: break
         default:
             guard let index = steps.firstIndex(of: screen), index + 1 < steps.count else { return go(to: .ready) }
             go(to: steps[index + 1])

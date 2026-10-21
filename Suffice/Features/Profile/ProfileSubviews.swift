@@ -134,7 +134,7 @@ extension AccountsListView {
             } catch BankSyncError.needsPlan {
                 showsPaywall = true
             } catch {
-                problem = error.localizedDescription
+                problem = FriendlyError.message(for: error, fallback: "That didn’t work with your bank just now. Try again in a moment.")
             }
         }
     }

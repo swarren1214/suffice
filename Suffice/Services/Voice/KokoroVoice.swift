@@ -309,7 +309,7 @@ extension KokoroModel: URLSessionDownloadDelegate {
                 try? FileManager.default.removeItem(at: destination)
                 try FileManager.default.moveItem(at: location, to: destination)
             } catch let moveError {
-                error = moveError.localizedDescription
+                error = "The natural voice couldn’t be saved on this device. Check that there’s free space, then try again."
             }
         }
         let result = error
@@ -318,7 +318,7 @@ extension KokoroModel: URLSessionDownloadDelegate {
 
     nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
         guard let error, (error as? URLError)?.code != .cancelled else { return }
-        let message = error.localizedDescription
+        let message = FriendlyError.message(for: error, fallback: "The natural voice couldn’t download just now. Try again in a moment.")
         Task { @MainActor in KokoroModel.shared.tryNextSource(or: message) }
     }
 

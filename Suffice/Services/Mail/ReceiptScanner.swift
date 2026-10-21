@@ -102,7 +102,7 @@ final class ReceiptScanner {
                 // Only moves forward once nothing is left behind; the rest waits for next time.
                 if allRead { defaults.set(started, forKey: EmailSettingsKey.lastScan(provider)) }
             } catch {
-                problem = error.localizedDescription
+                problem = FriendlyError.message(for: error, fallback: "Suffice couldn’t check your email for receipts just now. It will try again later.")
                 log.error("Scanning \(provider.rawValue, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
             }
         }

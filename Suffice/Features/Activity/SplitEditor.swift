@@ -293,7 +293,7 @@ struct SplitEditor: View {
             }
             suggested = true
         } catch {
-            suggestionError = error.localizedDescription
+            suggestionError = FriendlyError.message(for: error, fallback: "Suffice couldn’t suggest a split just now. You can still split it by hand.")
         }
     }
 

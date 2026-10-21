@@ -26,9 +26,16 @@ enum PlaidLink {
                     Task { @MainActor in run.finish(.success(result)) }
                 },
                 onExit: { exit in
-                    let message = exit.error.map { $0.displayMessage ?? $0.errorMessage }
+                    // Plaid's display message is written for people; its error message is for
+                    // developers, so it never shows.
+                    let failed = exit.error != nil
+                    let message = exit.error.flatMap(\.displayMessage)
                     Task { @MainActor in
-                        run.finish(.failure(message.map(BankSyncError.link) ?? BankSyncError.cancelled))
+                        if failed {
+                            run.finish(.failure(BankSyncError.link(message ?? "Your bank couldn’t be connected just now. Try again in a moment.")))
+                        } else {
+                            run.finish(.failure(BankSyncError.cancelled))
+                        }
                     }
                 },
                 onEvent: nil,

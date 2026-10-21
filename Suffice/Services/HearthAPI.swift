@@ -155,11 +155,35 @@ actor HearthAPI {
     /// `APIFailure` (code `HOUSEHOLD_HAS_MEMBERS` while they still manage a BigTable household
     /// with other people in it), and the account is kept when it fails.
     func deleteAccount() async throws {
-        _ = try await authorizedData(path: "/v1/me", method: "DELETE")
+        // Getting a token can fall back to a new anonymous session; never delete that instead.
+        let expired = APIFailure(status: 401, code: "SIGNED_OUT", message: "Your sign-in has expired. Sign in with Apple again, then delete your account.")
+        guard isSignedInWithApple else { throw expired }
+        var token = try await accessToken()
+        guard isSignedInWithApple else { throw expired }
+        var result = try await apiRequest(path: "/v1/me", method: "DELETE", body: nil, accessToken: token)
+        if result.response.statusCode == 401 {
+            token = try await accessToken(renew: true)
+            guard isSignedInWithApple else { throw expired }
+            result = try await apiRequest(path: "/v1/me", method: "DELETE", body: nil, accessToken: token)
+        }
+        guard (200..<300).contains(result.response.statusCode) else {
+            // APIFailure carries the code (HOUSEHOLD_HAS_MEMBERS) the caller explains.
+            if let envelope = try? JSONDecoder().decode(APIErrorEnvelope.self, from: result.data) {
+                throw APIFailure(status: result.response.statusCode, code: envelope.error.code, message: envelope.error.message)
+            }
+            throw Self.error(from: result.data, status: result.response.statusCode)
+        }
     }
 
     func createPlaidLinkToken() async throws -> Data {
         try await authorizedData(path: "/v1/banking/link-token", method: "POST", body: Data("{}".utf8))
+    }
+
+    /// The Hearth account's access token for HearthKit (household plans, the household's server
+    /// side): nil unless signed in with Apple, and never an anonymous session's.
+    func accessTokenIfSignedIn() async -> String? {
+        guard isSignedInWithApple, let token = try? await accessToken(), isSignedInWithApple else { return nil }
+        return token
     }
 
     /// True once the person has signed in with Apple (banking refuses anonymous sessions).
@@ -290,6 +314,9 @@ actor HearthAPI {
                 }
                 Self.log.notice("Refresh token rejected (\(message, privacy: .public)); starting a new anonymous session")
                 // Don't adopt this dead session again from the shared Keychain.
+                // Dead in every app (only when Supabase says the refresh token itself is invalid, not
+                // for any other 4xx): remove it from the shared sign-in too, if it's still there.
+                if Self.isDeadRefreshToken(message) { HearthAccounts.discardSession(ifRefreshToken: authSession?.refreshToken ?? refreshToken) }
                 Self.markDead(refreshToken: authSession?.refreshToken ?? refreshToken)
                 Self.deleteStoredSession()
                 authSession = nil
@@ -308,7 +335,13 @@ actor HearthAPI {
         let body = try JSONSerialization.data(withJSONObject: ["refresh_token": refreshToken])
         let refreshed: AuthSession = try await auth(path: "/auth/v1/token?grant_type=refresh_token", body: body)
         store(refreshed)
-        share(refreshed)
+        // Someone else signed in in another app while this was on its way: never write this
+        // account back over theirs (the next look follows them).
+        // (No shared session, but it was this account's: signed out elsewhere meanwhile.)
+        let sharedNow = HearthAccounts.session()
+        let mayShare = sharedNow.map { $0.userID == refreshed.user.id }
+            ?? (UserDefaults.standard.string(forKey: Self.sharedUserKey) != refreshed.user.id)
+        if mayShare { share(refreshed) } else { _ = followSharedSession() }
         return refreshed
     }
 
@@ -485,6 +518,12 @@ actor HearthAPI {
 
     private nonisolated static func tokenHash(_ token: String) -> String {
         SHA256.hash(data: Data(token.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Supabase's answer when the refresh token itself is no good ("Invalid Refresh Token: …"),
+    /// as opposed to any other rejected request.
+    private nonisolated static func isDeadRefreshToken(_ message: String) -> Bool {
+        message.localizedCaseInsensitiveContains("refresh token") || message.localizedCaseInsensitiveContains("invalid_grant")
     }
 
     private nonisolated static func markDead(refreshToken: String) {

@@ -192,7 +192,7 @@ struct OnboardingConnect: View {
             } catch BankSyncError.needsPlan {
                 showsPaywall = true
             } catch {
-                connectError = error.localizedDescription
+                connectError = FriendlyError.message(for: error, fallback: "Your bank couldn’t be connected just now. Try again, or add accounts by hand.")
             }
         }
     }

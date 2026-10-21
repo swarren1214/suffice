@@ -51,6 +51,7 @@ struct OverviewView: View {
 
             AccountCarousel(items: items, selection: $selection, cardWidth: cardWidth)
                 .padding(.top, 2)
+                .hearthTourTarget(SufficeTour.overview)
 
             CardPager(count: items.count, index: index) { position in
                 guard items.indices.contains(position) else { return }

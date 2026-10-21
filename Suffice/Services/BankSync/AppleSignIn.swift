@@ -17,7 +17,8 @@ final class AppleSignIn: NSObject, ASAuthorizationControllerDelegate, ASAuthoriz
         current = helper
         defer { current = nil }
         let request = ASAuthorizationAppleIDProvider().createRequest()
-        request.requestedScopes = [.fullName]
+        // The email too, so the Hearth account has the same one in every app.
+        request.requestedScopes = [.fullName, .email]
         helper.nonce = try HearthAPI.prepareAppleRequest(request)
         let credential: ASAuthorizationAppleIDCredential = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>) in
             helper.continuation = continuation

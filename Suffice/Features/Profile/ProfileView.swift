@@ -2,9 +2,8 @@ import AuthenticationServices
 import SwiftData
 import SwiftUI
 
-/// Profile, from the avatar at the top right: who you are, the household (the Hearth household,
-/// the same in every Hearth app), connected accounts, about, the Face ID lock, and erasing
-/// everything.
+/// Profile, from the photo at the top right: the shared Hearth Profile with Suffice's connected
+/// accounts, tax year, receipts, Ask Suffice, reminders and the Face ID lock.
 struct ProfileView: View {
     @Environment(\.modelContext) private var context
     @Environment(AppLock.self) private var lock
@@ -15,7 +14,6 @@ struct ProfileView: View {
     @AppStorage(SettingsKey.appleUserID) private var appleUserID = ""
     @AppStorage(SettingsKey.onboarded) private var onboarded = true
     @State private var editingMe = false
-    @State private var confirmsErase = false
     @State private var cloud = HouseholdSync.shared
     @State private var family = HearthHouseholdStore.shared
 
@@ -32,196 +30,128 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                VStack(spacing: 6) {
-                    if let me {
-                        // Your photo comes from the household; Edit changes it there.
-                        PersonAvatar(member: me, size: 84)
-                            .overlay(Circle().strokeBorder(.white.opacity(0.7), lineWidth: 3))
-                            .accessibilityHidden(true)
-                    } else {
-                        PersonAvatar(name: "?", color: .green, photo: nil, size: 84)
-                            .overlay(Circle().strokeBorder(.white.opacity(0.7), lineWidth: 3))
-                            .accessibilityHidden(true)
-                    }
-                    Text(me?.name ?? myPerson?.trimmedName ?? "Set up your household")
-                        .font(.title2.bold())
-                    // "HEARTH+" or "SUFFICE PLUS" when they have a plan.
-                    HearthMemberBadge()
-                    Text(statusLine)
-                        .font(.footnote)
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 10)
-
+        // The shared Hearth Profile (HearthProfile.swift), with Suffice's own section in the middle.
+        HearthProfileView(
+            app: .suffice,
+            profile: accountProfile,
+            sync: HearthProfileSync(summary: "Your budget", sharing: syncSharing) {
+                HouseholdSync.shared.syncSnapshot
+            } syncNow: {
+                await HouseholdSync.shared.syncNow()
+            },
+            erase: erase
+        ) {
+            Section {
                 ProfileAccount(me: me)
-
-                // Get Hearth+, or manage the plan.
-                HearthMembershipRow()
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .frame(minHeight: 54)
-                    .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-
-                SufficeSyncCard()
-
-                VStack(spacing: 0) {
-                    if myPerson != nil {
-                        Button { editingMe = true } label: {
-                            ProfileRow(symbol: "person", color: Color(hex: 0x3D3D3D), title: "My info", value: "")
-                        }
-                        Divider().padding(.leading, 60)
-                    }
-                    // The people (added and edited only here), inviting the family, and who's
-                    // using this device. The budget is shared with the household's adults.
-                    NavigationLink { HearthHouseholdView(accent: Brand.green) } label: {
-                        ProfileRow(
-                            symbol: HearthHouseholdLabel.symbol,
-                            color: Color(hex: 0x7B61FF),
-                            title: HearthHouseholdLabel.title,
-                            value: family.exists ? (family.people.count == 1 ? "1 person" : "\(family.people.count) people") : "Set up"
-                        )
-                    }
-                    Divider().padding(.leading, 60)
-                    NavigationLink { AccountsListView() } label: {
-                        ProfileRow(symbol: "building.columns", color: Color(hex: 0x2563C9), title: "Connected accounts", value: "\(accounts.count)")
-                    }
-                    Divider().padding(.leading, 60)
-                    NavigationLink { TaxYearView() } label: {
-                        ProfileRow(symbol: "doc.text.magnifyingglass", color: Color(hex: 0x1E7A40), title: "Tax Year", value: String(Calendar.current.component(.year, from: .now)))
-                    }
-                    Divider().padding(.leading, 60)
-                    NavigationLink { EmailConnectView() } label: {
-                        ProfileRow(symbol: "envelope.badge", color: Color(hex: 0xC2410C), title: "Receipts from Email", value: MailAccounts.shared.isConnected ? "On" : "")
-                    }
-                    Divider().padding(.leading, 60)
-                    #if DEBUG
-                    // The iCloud Sync card below shows sync status; this page is only the
-                    // CloudKit developer tools.
-                    NavigationLink { CloudSyncView() } label: {
-                        ProfileRow(symbol: "hammer", color: Color(hex: 0x1C8CF0), title: "CloudKit (Debug)", value: "")
-                    }
-                    Divider().padding(.leading, 60)
-                    #endif
-                    NavigationLink { AskSettingsView() } label: {
-                        ProfileRow(symbol: "sparkles", color: Color(hex: 0x5B3FD9), title: "Ask Suffice", value: OnDeviceModel.availability == .available ? "" : OnDeviceModel.availability.statusText)
-                    }
-                    Divider().padding(.leading, 60)
-                    NavigationLink { RemindersView() } label: {
-                        ProfileRow(symbol: "bell.badge", color: Color(hex: 0xC25E00), title: "Reminders", value: remindersValue)
-                    }
-                    Divider().padding(.leading, 60)
-                    NavigationLink { AboutView() } label: {
-                        ProfileRow(symbol: "info.circle", color: Brand.green, title: "About Suffice", value: "v\(AppConfig.version)")
-                    }
-                    Divider().padding(.leading, 60)
-                    HStack(spacing: 12) {
-                        ProfileIcon(symbol: "faceid", color: Color(hex: 0x3D3D3D))
-                        Toggle("Lock with \(lock.biometryName)", isOn: Binding(
-                            get: { faceIDLock },
-                            set: { faceIDLock = $0 && lock.canLock() }
-                        ))
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 54)
-                }
-                .buttonStyle(.plain)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-
-                NavigationLink { HearthAppsView(current: .suffice) } label: {
-                    HStack(spacing: 12) {
-                        HearthAppsRowLabel(current: .suffice)
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.footnote.weight(.bold))
-                            .foregroundStyle(.tertiary)
-                            .accessibilityHidden(true)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .frame(minHeight: 54)
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
-
-                Button(role: .destructive) { confirmsErase = true } label: {
-                    Label(cloud.isMember ? "Leave Household" : "Erase App Data", systemImage: cloud.isMember ? "rectangle.portrait.and.arrow.right" : "trash")
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Brand.expenseInk)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 40)
-                }
-                .buttonStyle(.glass)
-                .controlSize(.large)
-                .tint(Brand.expenseInk)
+                    .hearthAccountSectionRow()
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 32)
+        } settings: {
+            sufficeSection
+        } data: {
+        } about: {
         }
-        .background(alignment: .top) { HeaderGradient() }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Profile")
         // Pull down to fetch the latest from iCloud.
         .refreshable { await cloud.syncNow() }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Color.clear.frame(width: 1, height: 1).accessibilityHidden(true)
-            }
-            if myPerson != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { editingMe = true } label: {
-                        Text("Edit").foregroundStyle(.white)
-                    }
-                }
-            }
-        }
         // Your details live in the household, for every Hearth app.
         .sheet(isPresented: $editingMe) {
             if let myPerson {
                 HearthPersonEditor(member: myPerson, accent: Brand.green)
             }
         }
-        .alert(cloud.isMember ? "Leave the Household?" : "Erase App Data?", isPresented: $confirmsErase) {
-            Button("Cancel", role: .cancel) {}
-            if cloud.isMember {
-                // Erasing would delete the family's budget for everyone; leaving the household is
-                // a member's way to clear this device.
-                Button("Leave", role: .destructive) {
-                    Task { await family.leave() }
-                }
-            } else {
-                Button("Erase", role: .destructive) {
-                    // Disconnect banks on the API first (with the current session), then forget the
-                    // session, then erase, so a new sign-in afterwards isn't signed out.
-                    let itemIDs = ((try? context.fetch(FetchDescriptor<LinkedBank>())) ?? []).map(\.itemID)
-                    Task {
-                        for itemID in itemIDs { try? await HearthAPI.shared.disconnectBank(itemID: itemID) }
-                        await HearthAPI.shared.signOut()
-                        Ledger.eraseEverything(in: context)
-                        appleUserID = ""
-                        onboarded = false
-                    }
-                }
-            }
-        } message: {
-            if cloud.isMember {
-                Text("You’re in your family’s budget, so erasing would delete it for everyone. Leaving the household removes it from every Hearth app on this \(DeviceName.current) and brings back your own budget.")
-            } else if cloud.isSharing {
-                Text("This disconnects your banks and removes every transaction, budget, bill, account and person from your devices, your iCloud and everyone you share the household with. It can't be undone.\(appleUserID.isEmpty ? "" : " You’ll also be signed out of the other Hearth apps on this \(DeviceName.current).")")
-            } else {
-                Text("This disconnects your banks and removes every transaction, budget, bill, account and person from this device\(AppConfig.cloudSyncEnabled ? " and your iCloud" : ""). It can't be undone.\(appleUserID.isEmpty ? "" : " You’ll also be signed out of the other Hearth apps on this \(DeviceName.current).")")
-            }
-        }
     }
 
-    /// Where the budget lives. Who's signed in is in the account section below.
-    private var statusLine: String {
-        AppConfig.cloudSyncEnabled ? "iCloud sync on" : "Saved on this \(DeviceName.current)"
+    /// Who's signed in with Apple, for the account card at the top (nil shows Sign in with Apple).
+    private var accountProfile: HearthAccountProfile? {
+        guard !appleUserID.isEmpty else { return nil }
+        return HearthAccountProfile(name: me?.name, email: HearthAccounts.session()?.email, photo: me.flatMap { SufficeHearthHousehold.photo(forMemberID: $0.id) })
+    }
+
+    /// Suffice's own settings.
+    private var sufficeSection: some View {
+        Section("Suffice") {
+            if myPerson != nil {
+                Button { editingMe = true } label: {
+                    HearthProfileRow("My Info", systemImage: "person")
+                }
+            }
+            NavigationLink { AccountsListView() } label: {
+                HearthProfileRow("Connected Accounts", systemImage: "building.columns", value: "\(accounts.count)")
+            }
+            NavigationLink { TaxYearView() } label: {
+                HearthProfileRow("Tax Year", systemImage: "doc.text.magnifyingglass", value: String(Calendar.current.component(.year, from: .now)))
+            }
+            NavigationLink { EmailConnectView() } label: {
+                HearthProfileRow("Receipts from Email", systemImage: "envelope.badge", value: MailAccounts.shared.isConnected ? "On" : nil)
+            }
+            NavigationLink { AskSettingsView() } label: {
+                HearthProfileRow("Ask Suffice", systemImage: "sparkles", value: OnDeviceModel.availability == .available ? nil : OnDeviceModel.availability.statusText)
+            }
+            NavigationLink { RemindersView() } label: {
+                HearthProfileRow("Reminders", systemImage: "bell.badge", value: remindersValue)
+            }
+            Toggle(isOn: Binding(
+                get: { faceIDLock },
+                set: { faceIDLock = $0 && lock.canLock() }
+            )) {
+                Label {
+                    Text("Lock with \(lock.biometryName)")
+                } icon: {
+                    Image(systemName: "faceid").foregroundStyle(.primary)
+                }
+            }
+            NavigationLink { AboutView() } label: {
+                HearthProfileRow("About Suffice", systemImage: "info.circle", value: "v\(AppConfig.version)")
+            }
+            #if DEBUG
+            // The iCloud Sync page shows sync status; this page is only the CloudKit developer tools.
+            NavigationLink { CloudSyncView() } label: {
+                HearthProfileRow("CloudKit (Debug)", systemImage: "hammer")
+            }
+            #endif
+        }
+        .tint(.primary)
+    }
+
+    /// Who the budget is shared with: once a parent or adult in the household has joined, or when
+    /// this is someone else's budget.
+    private var syncSharing: HearthSyncSharing? {
+        guard cloud.isMember || (cloud.isSharing && !cloud.participants.isEmpty) else { return nil }
+        return HearthSyncSharing(
+            label: "Your household",
+            people: members.map { HearthSyncSharing.Person(id: $0.id.uuidString, initial: $0.initial, colorHex: $0.color.inkHex) }
+        )
+    }
+
+    /// Erase App Data, or Leave Household for a member (erasing would delete the family's budget
+    /// for everyone; leaving is a member's way to clear this device).
+    private var erase: HearthProfileErase {
+        if cloud.isMember {
+            return HearthProfileErase(
+                app: .suffice,
+                title: "Leave Household",
+                question: "Leave the Household?",
+                message: "You’re in your family’s budget, so erasing would delete it for everyone. Leaving the household removes it from every Hearth app on this \(DeviceName.current) and brings back your own budget.",
+                confirm: "Leave",
+                symbol: "rectangle.portrait.and.arrow.right"
+            ) {
+                await family.leave()
+            }
+        }
+        let signOutNote = appleUserID.isEmpty ? "" : " You’ll also be signed out of the other Hearth apps on this \(DeviceName.current)."
+        let message = cloud.isSharing
+            ? "This disconnects your banks and removes every transaction, budget, bill, account and person from your devices, your iCloud and everyone you share the household with. It can't be undone.\(signOutNote)"
+            : "This disconnects your banks and removes every transaction, budget, bill, account and person from this device\(AppConfig.cloudSyncEnabled ? " and your iCloud" : ""). It can't be undone.\(signOutNote)"
+        return HearthProfileErase(app: .suffice, title: "Erase App Data", question: "Erase App Data?", message: message) {
+            // Disconnect banks on the API first (with the current session), then forget the
+            // session, then erase, so a new sign-in afterwards isn't signed out.
+            let itemIDs = ((try? context.fetch(FetchDescriptor<LinkedBank>())) ?? []).map(\.itemID)
+            for itemID in itemIDs { try? await HearthAPI.shared.disconnectBank(itemID: itemID) }
+            await HearthAPI.shared.signOut()
+            Ledger.eraseEverything(in: context)
+            appleUserID = ""
+            onboarded = false
+            HearthProfilePresenter.shared.dismiss()
+        }
     }
 }
 
@@ -315,7 +245,7 @@ private struct ProfileAccount: View {
                 deleteError = "Remove the other people from your household in BigTable first."
                 return
             } catch {
-                deleteError = error.localizedDescription
+                deleteError = FriendlyError.message(for: error, fallback: "Your account couldn’t be deleted just now. Nothing was removed. Try again in a moment.")
                 return
             }
             let wasMember = cloud.isMember
@@ -347,7 +277,7 @@ struct ProfileAppleButton: View {
             do {
                 nonce = try HearthAPI.prepareAppleRequest(request)
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = FriendlyError.message(for: error, fallback: "Sign in with Apple couldn’t start. Try again.")
             }
         } onCompletion: { result in
             switch result {
@@ -368,13 +298,13 @@ struct ProfileAppleButton: View {
                         // Banks you connected on another device start syncing here too.
                         await BankSync.syncAll(memberID: UUID(uuidString: currentMember), in: context)
                     } catch {
-                        errorMessage = error.localizedDescription
+                        errorMessage = FriendlyError.message(for: error, fallback: "Suffice couldn’t finish signing you in. Try again in a moment.")
                     }
                 }
             case .failure(let error as ASAuthorizationError) where error.code == .canceled:
                 break
-            case .failure(let error):
-                errorMessage = error.localizedDescription
+            case .failure:
+                errorMessage = "Sign in with Apple didn’t finish. Try again."
             }
         }
         .modifier(AdaptiveSignInStyle())
@@ -388,7 +318,7 @@ struct ProfileAppleButton: View {
 
 #if DEBUG
 /// Profile › CloudKit (Debug): iCloud diagnostics and the development schema tool. Everyone
-/// else sees sync status on the iCloud Sync card on Profile.
+/// else sees sync status in Profile › iCloud Sync.
 private struct CloudSyncView: View {
     @State private var cloud = HouseholdSync.shared
     @State private var isSeeding = false
@@ -456,28 +386,6 @@ private struct CloudSyncView: View {
 }
 #endif
 
-/// The shared iCloud Sync card, filled in from household sync, on Profile.
-private struct SufficeSyncCard: View {
-    @Query(sort: \Member.sortOrder) private var members: [Member]
-    @State private var cloud = HouseholdSync.shared
-
-    var body: some View {
-        HearthSyncCard(app: .suffice, snapshot: cloud.syncSnapshot, summary: "Your budget", sharing: sharing) {
-            await HouseholdSync.shared.syncNow()
-        }
-    }
-
-    /// Who the budget is shared with: once a parent or adult in the household has joined, or when
-    /// this is someone else's budget.
-    private var sharing: HearthSyncSharing? {
-        guard cloud.isMember || (cloud.isSharing && !cloud.participants.isEmpty) else { return nil }
-        return HearthSyncSharing(
-            label: "Your household",
-            people: members.map { HearthSyncSharing.Person(id: $0.id.uuidString, initial: $0.initial, colorHex: $0.color.inkHex) }
-        )
-    }
-}
-
 private extension MemberColor {
     /// `ink` as 0xRRGGBB, for the iCloud Sync card's initials.
     var inkHex: UInt32 {
@@ -489,43 +397,6 @@ private extension MemberColor {
         case .pink: 0xA3245A
         case .teal: 0x0F6E69
         }
-    }
-}
-
-/// A Profile row: colored icon square, title, value and chevron.
-private struct ProfileRow: View {
-    var symbol: String
-    var color: Color
-    var title: String
-    var value: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ProfileIcon(symbol: symbol, color: color)
-            Text(title)
-            Spacer()
-            Text(value).foregroundStyle(Brand.secondaryText)
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 54)
-        .contentShape(.rect)
-    }
-}
-
-private struct ProfileIcon: View {
-    var symbol: String
-    var color: Color
-
-    var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 32, height: 32)
-            .background(color, in: .rect(cornerRadius: 9))
-            .accessibilityHidden(true)
     }
 }
 

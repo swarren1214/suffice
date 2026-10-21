@@ -29,7 +29,7 @@ nonisolated enum MailClient {
 
         var errorDescription: String? {
             switch self {
-            case .http(let code): "The mailbox didn’t answer (\(code)). Try again in a bit."
+            case .http: "Your mailbox didn’t answer. Try again in a bit."
             }
         }
     }

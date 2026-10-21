@@ -55,8 +55,7 @@ struct SufficeApp: App {
                 apiBaseURL: AppConfig.apiBaseURL,
                 accessToken: {
                     // Household plans need a real account; the anonymous session doesn't count.
-                    guard await HearthAPI.shared.isSignedInWithApple else { return nil }
-                    return try? await HearthAPI.shared.accessToken()
+                    await HearthAPI.shared.accessTokenIfSignedIn()
                 },
                 signInButton: { AnyView(ProfileAppleButton()) }
             )

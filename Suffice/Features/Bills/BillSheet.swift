@@ -547,7 +547,7 @@ struct BillImportSheet: View {
             }
             statement = added
         } catch {
-            problem = error.localizedDescription
+            problem = FriendlyError.message(for: error, fallback: "Suffice couldn’t read this statement. You can still fill in the bill by hand.")
         }
     }
 }

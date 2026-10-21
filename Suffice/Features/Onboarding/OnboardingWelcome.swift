@@ -4,6 +4,7 @@ import SwiftUI
 /// Started. Joining the family's budget happens in the household step (its invitation).
 struct OnboardingWelcome: View {
     @Environment(OnboardingFlow.self) private var flow
+    @AppStorage(SettingsKey.appleUserID) private var appleUserID = ""
     @State private var height: CGFloat = 844
 
     /// iPhone SE and the like: the stacked cards don't fit with everything else.
@@ -42,9 +43,21 @@ struct OnboardingWelcome: View {
             Spacer(minLength: 16)
 
             VStack(spacing: 12) {
-                Button("Get Started") { flow.go(to: .household) }
-                    .buttonStyle(.onboarding())
-                Text("Your budget lives in your own iCloud. No ads, no tracking.")
+                if appleUserID.isEmpty {
+                    // Optional, as in every Hearth app: one sign-in for all of them. Connecting a
+                    // bank needs it; everything else works without it.
+                    ProfileAppleButton()
+                        .frame(maxWidth: .infinity, minHeight: 52, maxHeight: 52)
+                        .clipShape(.capsule)
+                    Button("Continue Without an Account") { flow.go(to: .household) }
+                        .buttonStyle(.onboarding(.plain))
+                } else {
+                    Button("Get Started") { flow.go(to: .household) }
+                        .buttonStyle(.onboarding())
+                }
+                Text(appleUserID.isEmpty
+                     ? "Optional. One sign-in for every Hearth app, needed to connect a bank. Your budget lives in your own iCloud. No ads, no tracking."
+                     : "Your budget lives in your own iCloud. No ads, no tracking.")
                     .font(.system(size: 12))
                     .foregroundStyle(OnboardingStyle.tertiaryText)
                     .multilineTextAlignment(.center)
@@ -58,6 +71,10 @@ struct OnboardingWelcome: View {
         .frame(maxWidth: OnboardingStyle.columnWidth)
         .frame(maxWidth: .infinity)
         .background(OnboardingStyle.wash.ignoresSafeArea())
+        // Signed in with Apple here: on to the household.
+        .onChange(of: appleUserID) { _, id in
+            if !id.isEmpty { flow.go(to: .household) }
+        }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
     }
 }

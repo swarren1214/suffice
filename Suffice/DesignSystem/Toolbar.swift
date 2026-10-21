@@ -1,4 +1,3 @@
-import SwiftData
 import SwiftUI
 
 /// The glass month capsule at the top left of every tab: a calendar icon, the month and a chevron. It opens a
@@ -158,27 +157,11 @@ struct AskButton: View {
     }
 }
 
-/// The signed-in person's photo (or initial) at the top right. Opens Profile.
-///
-/// Drawn as a live view, not an image: the toolbar repaints images in one flat color, which
-/// turned the photo into a plain white circle.
+/// The person's photo at the top right: the shared Hearth profile button (HearthProfile.swift),
+/// the same in every Hearth app. Opens the Profile sheet.
 struct ProfileButton: View {
-    @Query(sort: \Member.sortOrder) private var members: [Member]
-    @AppStorage(SettingsKey.currentMember) private var currentMember = ""
-
     var body: some View {
-        NavigationLink {
-            ProfileView()
-        } label: {
-            if let me = members.first(where: { $0.id.uuidString == currentMember }) {
-                PersonAvatar(member: me, size: 30)
-            } else {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.white)
-            }
-        }
-        .accessibilityLabel("View Profile")
+        HearthProfileButton()
     }
 }
 

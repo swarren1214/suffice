@@ -154,7 +154,7 @@ final class MailAccounts {
     func finish(_ request: Request, callback: URL) async throws {
         let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
         if let error = items.first(where: { $0.name == "error" })?.value {
-            throw error == "access_denied" ? Failure.cancelled : Failure.rejected("The sign-in didn’t work (\(error)).")
+            throw error == "access_denied" ? Failure.cancelled : Failure.rejected("Your email provider didn’t finish signing in. Try connecting again.")
         }
         guard items.first(where: { $0.name == "state" })?.value == request.state,
               let code = items.first(where: { $0.name == "code" })?.value

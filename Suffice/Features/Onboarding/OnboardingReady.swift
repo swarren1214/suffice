@@ -2,13 +2,11 @@ import CloudKit
 import SwiftData
 import SwiftUI
 
-/// All set: what Suffice is keeping an eye on now, then Show Me Around (the tour) or Jump
-/// Right In.
+/// All set: what Suffice is keeping an eye on now, then Continue to Better with Hearth (where
+/// Show Me Around and Jump In are).
 struct OnboardingReady: View {
-    /// Finishes onboarding; true to start the tour.
-    var finish: (_ tour: Bool) -> Void
+    var onContinue: () -> Void
 
-    @Environment(OnboardingFlow.self) private var flow
     @Environment(AppRouter.self) private var router
     @Query private var categories: [BudgetCategory]
     @Query private var bills: [Bill]
@@ -18,8 +16,8 @@ struct OnboardingReady: View {
     @State private var family = HearthHouseholdStore.shared
     @State private var appeared = false
 
-    init(finish: @escaping (_ tour: Bool) -> Void) {
-        self.finish = finish
+    init(onContinue: @escaping () -> Void) {
+        self.onContinue = onContinue
     }
 
     private var myName: String { family.me?.firstName ?? "" }
@@ -105,12 +103,8 @@ struct OnboardingReady: View {
             Spacer(minLength: 16)
 
             VStack(spacing: 10) {
-                Button { finish(true) } label: {
-                    Label("Show Me Around", systemImage: "hand.point.up.left.fill")
-                }
-                .buttonStyle(.onboarding(.white))
-                Button("Jump Right In") { finish(false) }
-                    .buttonStyle(.onboarding(.plain))
+                Button("Continue", action: onContinue)
+                    .buttonStyle(.onboarding(.white))
             }
             .padding(.bottom, 12)
         }

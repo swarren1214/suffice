@@ -65,6 +65,12 @@ struct RootTabView: View {
         .tabViewStyle(.sidebarAdaptable)
         .tabViewSearchActivation(.searchTabSelection)
         .tabBarMinimizeBehavior(.onScrollDown)
+        // Profile, opened by the photo at the top right of every main screen.
+        .hearthProfile { ProfileView() }
+        // The tour (HearthTour.swift): Welcome after onboarding, then one step per tab.
+        .hearthTour(app: .suffice, steps: SufficeTour.steps, finishTitle: "Got It", autoStart: !ScreenshotMode.isOn) { step in
+            router.tab = SufficeTour.tab(for: step)
+        }
         .sheet(isPresented: Binding(
             get: { self.router.showsAsk && purchases.isUnlocked },
             set: { self.router.showsAsk = $0 }
