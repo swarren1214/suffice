@@ -1,3 +1,4 @@
+import Combine
 import SwiftData
 import SwiftUI
 import UIKit
@@ -25,6 +26,13 @@ struct SufficeApp: App {
             // The budget syncs in the Hearth household's iCloud: its zone registers with the
             // household before the household starts (AppRoot's task).
             HouseholdSync.shared.start(container)
+            // A person's own choices follow them to their other devices.
+            PersonalSettings.shared.start()
+            // Onboarded before iCloud remembered it: say so now, so this person's other devices
+            // skip onboarding.
+            if UserDefaults.standard.bool(forKey: SettingsKey.onboarded) {
+                HearthOnboarding.rememberInCloud(.suffice)
+            }
         }
         // Alerts use the system label color rather than the brand green. Destructive buttons stay red.
         UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self]).tintColor = .label
@@ -169,13 +177,26 @@ final class AppRouter {
     }
 }
 
-/// Onboarding the first time, the tabs after that, and the Face ID cover when locked.
+/// Onboarding the first time, the tabs after that, and the Face ID cover when locked. Someone
+/// who finished onboarding on another of their devices skips it (a new device asks iCloud for a
+/// moment first), and so does someone joining the family's budget (`HouseholdSync`).
 struct AppRoot: View {
+    /// A device that hasn't onboarded asks iCloud first, so it doesn't show Welcome to someone
+    /// who already went through it on their iPhone.
+    @State private var checkingCloud = !UserDefaults.standard.bool(forKey: SettingsKey.onboarded) && !ScreenshotMode.isOn
+
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var context
     @Environment(AppRouter.self) private var router
     @Environment(AppLock.self) private var lock
     @AppStorage(SettingsKey.onboarded) private var onboarded = false
+
+    /// Onboarding's done for this person already: none of its steps here.
+    private func skipOnboarding() {
+        HearthOnboarding.finishWithoutSteps(.suffice)
+        AppRouter.shared.tab = .overview
+        onboarded = true
+    }
     /// The budget's sync (the Hearth container's Budget zone).
     @State private var household = HouseholdSync.shared
     /// The Hearth household: the same family in every Hearth app. Suffice always has one.
@@ -186,18 +207,32 @@ struct AppRoot: View {
         Group {
             if onboarded {
                 RootTabView()
+            } else if checkingCloud {
+                CloudCheckView()
             } else {
                 OnboardingView()
             }
         }
         .tint(Brand.green)
         .animation(.smooth, value: onboarded)
-        // Joined a family's household and its budget arrived: say what happened to this one.
-        .alert("You’re in the Family Budget", isPresented: $household.showsJoinedNotice) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("You share one budget with \(family.ownerName ?? "your family") and see every change. The budget on this \(DeviceName.current) is replaced by the shared one. Yours stays in your iCloud and comes back if you leave.")
+        .animation(.smooth, value: checkingCloud)
+        .task {
+            guard checkingCloud else { return }
+            if await HearthOnboarding.waitForOtherDevices(.suffice) { skipOnboarding() }
+            checkingCloud = false
         }
+        // Finished on another device while onboarding is showing here.
+        .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification).receive(on: RunLoop.main)) { _ in
+            if !onboarded, HearthOnboarding.isDoneOnAnotherDevice(.suffice) { skipOnboarding() }
+        }
+        // Joined a family's household and its budget arrived: say what happened to this one.
+        // Joining happens in Profile › Household, a sheet: shown above it, not behind it
+        // (HearthProfile.swift).
+        .hearthNotice(
+            "You’re in the Family Budget",
+            isPresented: $household.showsJoinedNotice,
+            message: "You share one budget with \(family.ownerName ?? "your family") and see every change. The budget on this \(DeviceName.current) is replaced by the shared one. Yours stays in your iCloud and comes back if you leave."
+        )
         .overlay {
             if household.isWorking {
                 ProgressView()
@@ -311,5 +346,21 @@ struct AppRoot: View {
                 break
             }
         }
+    }
+}
+
+/// A new device, for a moment, while iCloud says whether this person already set Suffice up.
+private struct CloudCheckView: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .controlSize(.large)
+            Text("Checking iCloud…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 }

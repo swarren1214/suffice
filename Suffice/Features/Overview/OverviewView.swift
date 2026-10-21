@@ -17,7 +17,8 @@ struct OverviewView: View {
     @Query(sort: \BudgetCategory.sortOrder) private var categories: [BudgetCategory]
     @Query(sort: \Member.sortOrder) private var members: [Member]
     @AppStorage(SettingsKey.currentMember) private var currentMember = ""
-    /// Card colors picked in an account's Card color row, by account ID. On this device only.
+    /// Card colors picked in an account's Card color row, by account ID. Follows the person to
+    /// their other devices (PersonalSettings).
     @AppStorage(SettingsKey.cardStyles) private var savedStyles = ""
     @SceneStorage("overview.card") private var selection = AccountCardItem.allID
     @State private var showsConnect = false

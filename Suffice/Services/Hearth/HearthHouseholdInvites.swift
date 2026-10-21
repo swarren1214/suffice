@@ -18,6 +18,7 @@
 //   invited them, what they get, and the family's plan with Sign in with Apple. Joining makes
 //   them the person the invitation was for: nothing to pick.
 
+import CloudKit
 import Contacts
 import ContactsUI
 import CoreImage.CIFilterBuiltins
