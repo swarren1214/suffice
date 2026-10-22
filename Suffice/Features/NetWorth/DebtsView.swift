@@ -7,6 +7,7 @@ struct DebtsView: View {
     @Query(sort: \Loan.sortOrder) private var loans: [Loan]
     @State private var addsLoan = false
     @State private var showsPaidOff = false
+    @State private var gridWidth: CGFloat = 0
 
     var body: some View {
         let open = loans.filter { !$0.isPaidOff }
@@ -20,7 +21,8 @@ struct DebtsView: View {
             } else {
                 DebtsSummaryCard(lines: rows)
 
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                // Always an even number of columns, so a fold falls between tiles.
+                LazyVGrid(columns: HearthEvenColumns.flexible(HearthEvenColumns.count(for: gridWidth, minimumCellWidth: 150), spacing: 10), spacing: 10) {
                     ForEach(rows) { line in
                         NavigationLink {
                             LoanDetailView(loan: line.loan)
@@ -30,6 +32,7 @@ struct DebtsView: View {
                         .buttonStyle(.plain)
                     }
                 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { gridWidth = $0 }
 
                 SectionTitle("Payoff timeline")
                 PayoffTimeline(lines: rows)

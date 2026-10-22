@@ -54,6 +54,11 @@ private struct MonthBills: View {
     @State private var differentAmount: DraftItem?
     @State private var stashing: StashSheetItem?
     @State private var reviewing: BillStatement?
+    @Environment(\.hearthDuoPose) private var pose
+    /// Bill night (iPhone Duo, Laptop): the bill being worked on. Kept here, above the pose
+    /// layouts, so folding and unfolding keeps the place in the queue.
+    @State private var nightBillID: String?
+    @State private var viewingStatement: BillStatement?
 
     /// How far back to look for unpaid bills while showing this month.
     private static let overdueWindowDays = 62
@@ -79,6 +84,10 @@ private struct MonthBills: View {
         let statementRecords = statements.map(\.record)
         let newBills = statements.filter { !$0.isReviewed }
 
+        Group {
+        if pose == .laptop, isThisMonth, !bills.isEmpty {
+            billNight(dues: upcoming + subscriptionDues, payments: payments)
+        } else {
         GreenScreen("Bills") {
             if bills.isEmpty {
                 EmptyCard(systemName: "calendar", title: "No bills yet", message: "Tap + to add the bills you pay on a schedule, like the mortgage, phone and power.")
@@ -139,8 +148,13 @@ private struct MonthBills: View {
                 }
             }
         }
+        }
+        }
         // Pull down to fetch the latest from iCloud.
         .refreshable { await HouseholdSync.shared.syncNow() }
+        .sheet(item: $viewingStatement) { statement in
+            StatementDocumentView(statement: statement)
+        }
         .sheet(item: $editing) { bill in
             BillSheet(bill: bill)
         }
@@ -153,6 +167,60 @@ private struct MonthBills: View {
         .sheet(item: $stashing) { item in
             StashEditor(stash: item.stash, initial: item.draft)
         }
+    }
+
+    // MARK: Bill night (iPhone Duo, Laptop)
+
+    /// Propped up on a table, working down the week's bills: the statement and its history on
+    /// the upright half, the queue and Mark Paid on the flat half. Mark Paid moves on to the
+    /// next bill by itself.
+    private func billNight(dues: [BillDue], payments: [EntryRecord]) -> some View {
+        let calendar = Calendar.current
+        let weekEnd = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: .now)) ?? .now
+        let queue = dues
+            .filter { !$0.state.isPaid && $0.date < weekEnd }
+            .sorted { ($0.state.sortRank, $0.date) < ($1.state.sortRank, $1.date) }
+        let current = queue.first { $0.id == nightBillID } ?? queue.first
+        let records = statements.map(\.record)
+
+        return HearthFoldOverlay {
+            BillNightQueue(queue: queue, currentID: current?.id, select: { due in
+                withAnimation(.snappy) { nightBillID = due.id }
+            }, markPaid: { due in
+                markPaidAndAdvance(due, queue: queue)
+            })
+        } content: {
+            BillNightStatement(
+                due: current,
+                statement: current.flatMap { due in StatementMath.statement(for: due.bill.record, dueOn: due.date, statements: records) },
+                history: current.map { history(for: $0.bill, statements: records, payments: payments) } ?? [],
+                view: { record in viewingStatement = statements.first { $0.id == record.id } },
+                open: { editing = $0 }
+            )
+        }
+        .duoGreenChrome("Bill Night")
+    }
+
+    /// The bill's last six amounts, oldest first: its statements, or (with none) its payments.
+    private func history(for bill: Bill, statements: [StatementRecord], payments: [EntryRecord]) -> [BillNightAmount] {
+        let fromStatements = StatementMath.history(bill.id, statements: statements, limit: 6)
+        if !fromStatements.isEmpty {
+            return fromStatements.reversed().map { BillNightAmount(id: $0.id, date: $0.dueDate, cents: $0.amountCents) }
+        }
+        return payments
+            .filter { $0.billID == bill.id }
+            .sorted { $0.date < $1.date }
+            .suffix(6)
+            .map { BillNightAmount(id: $0.id, date: $0.billDueDate ?? $0.date, cents: $0.amountCents) }
+    }
+
+    /// Mark Paid, then on to the next bill in the queue.
+    private func markPaidAndAdvance(_ due: BillDue, queue: [BillDue]) {
+        let next = queue.firstIndex { $0.id == due.id }.flatMap { index in
+            queue.indices.contains(index + 1) ? queue[index + 1] : nil
+        }
+        togglePaid(due)
+        withAnimation(.snappy) { nightBillID = next?.id }
     }
 
     /// Each bill with a stash, and what's stashed for it a month.
@@ -455,4 +523,181 @@ private struct NewStatementCard: View {
 #Preview {
     NavigationStack { BillsView() }
         .previewEnvironment()
+}
+
+// MARK: - Bill night pieces
+
+/// One amount in a bill's history.
+private struct BillNightAmount: Identifiable {
+    var id: UUID
+    var date: Date
+    var cents: Int
+}
+
+/// The upright half: the bill being worked on, its statement, and its last six amounts as six
+/// even columns (so nothing lands in the fold).
+private struct BillNightStatement: View {
+    let due: BillDue?
+    let statement: StatementRecord?
+    let history: [BillNightAmount]
+    let view: (StatementRecord) -> Void
+    let open: (Bill) -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if let due {
+                    GlassCard {
+                        GlassCardHeader(title: due.bill.name, note: due.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
+                        GlassFigure(text: statement.map { Money.text($0.amountCents) } ?? due.bill.amountLabel)
+                        Text(detail(due))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 10) {
+                            if let statement {
+                                Button { view(statement) } label: {
+                                    Label("View Statement", systemImage: "doc.text")
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                .buttonStyle(.glass)
+                                .tint(.primary)
+                            }
+                            Button { open(due.bill) } label: {
+                                Label("Bill Details", systemImage: "info.circle")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .buttonStyle(.glass)
+                            .tint(.primary)
+                        }
+                    }
+                    Card {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Last six")
+                                .font(.headline)
+                            HistoryBars(amounts: history)
+                        }
+                    }
+                } else {
+                    EmptyCard(systemName: "checkmark.seal", title: "All paid", message: "Nothing else is due this week.", isGlass: true)
+                }
+            }
+            .padding(16)
+        }
+    }
+
+    private func detail(_ due: BillDue) -> String {
+        var parts: [String] = []
+        if case .overdue(let days) = due.state { parts.append(days == 1 ? "1 day late" : "\(days) days late") }
+        if case .dueToday = due.state { parts.append("Due today") }
+        parts.append(BudgetMath.scheduleText(due.bill.record))
+        if statement != nil { parts.append("From its statement") }
+        if due.bill.isAutopay { parts.append("Autopay") }
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// Six even columns, oldest on the left; empty slots when there's less history.
+private struct HistoryBars: View {
+    let amounts: [BillNightAmount]
+
+    var body: some View {
+        let most = max(amounts.map(\.cents).max() ?? 0, 1)
+        let slots: [BillNightAmount?] = [BillNightAmount?](repeating: nil, count: max(6 - amounts.count, 0)) + amounts.suffix(6).map { amount -> BillNightAmount? in amount }
+        LazyVGrid(columns: HearthEvenColumns.flexible(6, spacing: 8), spacing: 8) {
+            ForEach(Array(slots.enumerated()), id: \.offset) { index, amount in
+                VStack(spacing: 4) {
+                    Text(amount.map { Money.compact($0.cents) } ?? " ")
+                        .font(.caption2.weight(.semibold))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    ZStack(alignment: .bottom) {
+                        Capsule().fill(Color(.systemGray6))
+                        if let amount {
+                            Capsule()
+                                .fill(index == slots.count - 1 ? Brand.green : Brand.green.opacity(0.45))
+                                .frame(height: max(6, 80 * CGFloat(amount.cents) / CGFloat(most)))
+                        }
+                    }
+                    .frame(height: 80)
+                    Text(amount.map { $0.date.formatted(.dateTime.month(.abbreviated)) } ?? " ")
+                        .font(.caption2)
+                        .foregroundStyle(Brand.secondaryText)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(amount.map { $0.date.formatted(.dateTime.month(.wide).year()) } ?? "No amount")
+                .accessibilityValue(amount.map { Money.text($0.cents) } ?? "")
+            }
+        }
+    }
+}
+
+/// The flat half: the week's unpaid bills, the current one marked, and Mark Paid.
+private struct BillNightQueue: View {
+    let queue: [BillDue]
+    let currentID: String?
+    let select: (BillDue) -> Void
+    let markPaid: (BillDue) -> Void
+
+    var body: some View {
+        let current = queue.first { $0.id == currentID }
+        VStack(spacing: 10) {
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(queue) { due in
+                        Button { select(due) } label: {
+                            HStack(spacing: 12) {
+                                Text(due.bill.initial)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 32, height: 32)
+                                    .background(due.bill.color.ink, in: .circle)
+                                    .accessibilityHidden(true)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(due.bill.name)
+                                        .font(.body.weight(.medium))
+                                        .lineLimit(1)
+                                    Text(due.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
+                                        .font(.caption)
+                                        .foregroundStyle(isLate(due) ? Brand.expenseInk : Brand.secondaryText)
+                                }
+                                Spacer(minLength: 8)
+                                Text(due.bill.amountLabel)
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
+                            }
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(due.id == currentID ? Color.primary.opacity(0.08) : Color.clear, in: .rect(cornerRadius: 14))
+                            .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(due.id == currentID ? .isSelected : [])
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+            if let current {
+                Button { markPaid(current) } label: {
+                    Label("Mark \(current.bill.name) Paid", systemImage: "checkmark")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .tint(Brand.green)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 26))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+
+    private func isLate(_ due: BillDue) -> Bool {
+        if case .overdue = due.state { true } else { false }
+    }
 }

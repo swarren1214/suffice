@@ -124,7 +124,7 @@ struct BillSheet: View {
                     SheetCancelButton("Close") { dismiss() }
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Edit") { editing = true }
+                    Button("Edit", systemImage: "pencil") { editing = true }
                         .tint(.primary)
                 }
             }

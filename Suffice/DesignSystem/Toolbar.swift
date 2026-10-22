@@ -167,18 +167,21 @@ struct ProfileButton: View {
 
 extension View {
     /// The standard top bar for a tab: month capsule on the left; Ask, the screen's action and
-    /// the profile avatar sharing a glass capsule on the right.
-    func tabToolbar<Action: View>(@ViewBuilder action: @escaping () -> Action) -> some View {
+    /// the profile avatar sharing a glass capsule on the right. `isShown: false` leaves it out
+    /// (Budget on the iPhone Duo's outer display, where Add Expense is the only item).
+    func tabToolbar<Action: View>(isShown: Bool = true, @ViewBuilder action: @escaping () -> Action) -> some View {
         toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                MonthMenu()
-            }
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                // White icons, also in the "…" menu if the bar runs out of room (the app's tint
-                // is green, which made menu icons green beside white text).
-                AskButton().tint(.white)
-                action().tint(.white)
-                ProfileButton()
+            if isShown {
+                ToolbarItem(placement: .topBarLeading) {
+                    MonthMenu()
+                }
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    // White icons, also in the "…" menu if the bar runs out of room (the app's tint
+                    // is green, which made menu icons green beside white text).
+                    AskButton().tint(.white)
+                    action().tint(.white)
+                    ProfileButton()
+                }
             }
         }
     }

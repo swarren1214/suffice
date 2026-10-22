@@ -78,22 +78,25 @@ struct AskView: View {
                     }
                     .accessibilityElement(children: .combine)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                // A title and a symbol on each, so they work on the iPhone Duo's rail and in the
+                // overflow menu.
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
                         if spokenReplies { speaker.stop() }
                         spokenReplies.toggle()
                     } label: {
-                        Image(systemName: spokenReplies ? (speaker.isActive ? "speaker.wave.2.fill" : "speaker.wave.2") : "speaker.slash")
-                            .symbolEffect(.variableColor.iterative, options: .repeating, isActive: speaker.isActive)
+                        Label {
+                            Text(spokenReplies ? "Spoken Replies On" : "Spoken Replies Off")
+                        } icon: {
+                            Image(systemName: spokenReplies ? (speaker.isActive ? "speaker.wave.2.fill" : "speaker.wave.2") : "speaker.slash")
+                                .symbolEffect(.variableColor.iterative, options: .repeating, isActive: speaker.isActive)
+                        }
                     }
-                    .accessibilityLabel(spokenReplies ? "Spoken replies on" : "Spoken replies off")
                     .accessibilityHint(spokenReplies ? "Turns off spoken replies" : "Turns on spoken replies")
                     // Not a confirm button: the text color, not the app's (AGENT.md).
                     .tint(.primary)
-                }
-                if !engine.messages.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Clear") {
+                    if !engine.messages.isEmpty {
+                        Button("Clear", systemImage: "eraser") {
                             speaker.stop()
                             withAnimation(.snappy) { engine.reset() }
                             refresh()

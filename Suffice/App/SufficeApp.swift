@@ -76,6 +76,9 @@ struct SufficeApp: App {
     var body: some Scene {
         WindowGroup {
             AppRoot()
+                // iPhone Duo: reads the pose (outer display, open wide, Book, Laptop) once for
+                // the whole window and passes it down as \.hearthDuoPose (HearthDuo.swift).
+                .hearthDuoPose()
                 .background(KeyboardDismissal().frame(width: 0, height: 0))
                 // The Hearth launch splash.
                 .hearthSplash(.suffice, isEnabled: !ScreenshotMode.isOn)
