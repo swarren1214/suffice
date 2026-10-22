@@ -1,15 +1,22 @@
 import SwiftUI
 
+/// The watch app's pages, top to bottom.
+nonisolated enum WatchPage: Hashable {
+    case leftToSpend, budgets, bills
+}
+
 /// Three pages, swiped up and down: left to spend, the budgets, and bills coming up.
 struct WatchRootView: View {
     @Environment(WatchStore.self) private var store
+    /// The first page, or the one screenshot mode asks for.
+    @State private var page: WatchPage = ScreenshotMode.screen?.page ?? .leftToSpend
 
     var body: some View {
         if let snapshot = store.snapshot {
-            TabView {
-                LeftToSpendPage(snapshot: snapshot)
-                BudgetsPage(snapshot: snapshot)
-                BillsPage(snapshot: snapshot)
+            TabView(selection: $page) {
+                LeftToSpendPage(snapshot: snapshot).tag(WatchPage.leftToSpend)
+                BudgetsPage(snapshot: snapshot).tag(WatchPage.budgets)
+                BillsPage(snapshot: snapshot).tag(WatchPage.bills)
             }
             .tabViewStyle(.verticalPage)
             .containerBackground(Brand.green.gradient.opacity(0.35), for: .tabView)

@@ -5,7 +5,8 @@ import WidgetKit
 
 /// The latest numbers from the iPhone. The iPhone sends a new snapshot whenever the budget
 /// changes (WatchSync on the phone); it's saved in the watch's app group, where the
-/// complications read it, and the complications are asked to redraw.
+/// complications read it, and the complications are asked to redraw. In screenshot mode it holds
+/// the demo snapshot instead and never talks to the iPhone or the app group (see ScreenshotMode).
 @Observable
 final class WatchStore: NSObject {
     static let shared = WatchStore()
@@ -14,6 +15,10 @@ final class WatchStore: NSObject {
 
     override init() {
         super.init()
+        if ScreenshotMode.isOn {
+            snapshot = ScreenshotMode.demoSnapshot()
+            return
+        }
         snapshot = WidgetStore.load()
         if WCSession.isSupported() {
             let session = WCSession.default
