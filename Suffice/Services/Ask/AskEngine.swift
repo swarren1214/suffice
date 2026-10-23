@@ -89,6 +89,26 @@ nonisolated struct TransactionsTool: Tool {
     }
 }
 
+nonisolated struct DaysTool: Tool {
+    let name = "getDay"
+    let description = "Lists every transaction on one day (\"October 10\", \"yesterday\") or a few days in a row, with what was spent and came in."
+    let data: AskData
+
+    @Generable
+    nonisolated struct Arguments {
+        @Guide(description: "The month, 1 for January to 12 for December", .range(1...12))
+        var month: Int
+        @Guide(description: "The day of the month", .range(1...31))
+        var day: Int
+        @Guide(description: "How many days from that day, 1 for just that day", .range(1...31))
+        var days: Int
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        await data.dayText(month: arguments.month, day: arguments.day, days: arguments.days)
+    }
+}
+
 nonisolated struct AffordTool: Tool {
     let name = "checkAffordability"
     let description = "Gets what's left this month (in budgets, after bills, and cash) to judge whether a purchase fits."
@@ -211,7 +231,7 @@ final class AskEngine {
 
         Rules:
         - Get every number from a tool first. Never guess an amount.
-        - getBudget for one budget, getBudgets for all, getBills for bills, getSpending for where money went, findTransactions for a store or payee, checkAffordability for "can we afford", getStashes for saving toward yearly bills ("are we saving enough for Christmas?"), getRunway for "how long could we last?".
+        - getBudget for one budget, getBudgets for all, getBills for bills, getSpending for where money went in a month, getDay for a specific day or days ("what did we spend on October 10?", "yesterday"), findTransactions for a store or payee, checkAffordability for "can we afford", getStashes for saving toward yearly bills ("are we saving enough for Christmas?"), getRunway for "how long could we last?".
         - To move money between budgets, check getBudgets, then fill moveFrom, moveTo and moveDollars. Don't say it's done; they confirm it.
         - No investment, tax, legal or credit advice. Only talk about their money in Suffice.
         """
@@ -229,7 +249,7 @@ final class AskEngine {
         return LanguageModelSession(
             tools: [
                 BudgetsTool(data: data), BudgetTool(data: data), BillsTool(data: data),
-                SpendingTool(data: data), TransactionsTool(data: data), AffordTool(data: data),
+                SpendingTool(data: data), TransactionsTool(data: data), DaysTool(data: data), AffordTool(data: data),
                 StashesTool(data: data), RunwayTool(data: data),
             ],
             instructions: Self.instructions

@@ -195,8 +195,17 @@ final class AskData {
 
     /// findTransactions: transactions whose payee, note or budget matches.
     func transactionsText(matching search: String, monthsBack: Int) -> String {
-        let words = AskText.words(search)
+        // A store or payee: HearthMoney's query and words, as Ember answers it.
         let from = Self.month(monthsAgo: monthsBack).start
+        let span = HearthMoney.Span(start: from, end: Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: .now)) ?? .now)
+        let book = self.book
+        if HearthMoney.run(HearthMoney.Query(span: span, payee: search), in: book, comparing: false).count > 0 {
+            let reply = HearthMoney.answer(HearthMoney.Ask(kind: .spending, span: span, place: search), book: book)
+            let rows = reply.rows.prefix(8).map { "\($0.detail): \($0.title) \($0.value)" }
+            return ([reply.text] + rows).joined(separator: "\n")
+        }
+        // Otherwise a word in a note or a budget's name.
+        let words = AskText.words(search)
         let lookup = Lookup(categories: categories, members: members)
         let matches = entries.filter { entry in
             guard entry.date >= from else { return false }
@@ -213,6 +222,44 @@ final class AskData {
             lines.append("\(entry.date.formatted(.dateTime.month(.abbreviated).day())): \(entry.payee) \(entry.kind == .income ? "+" : "")\(Money.text(entry.amountCents))\(who)")
         }
         if matches.count > 8 { lines.append("…and \(matches.count - 8) more.") }
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: HearthMoney (shared with Ember)
+
+    /// The household's money as HearthMoney's values: the same query and wording Ember uses.
+    var book: HearthMoney.Book {
+        HearthMoney.Book(
+            categories: categories.map(\.record.money),
+            entries: entries.map { entry in
+                var money = entry.record.money
+                money.place = entry.placeName
+                return money
+            },
+            bills: bills.map(\.record.money),
+            members: members.map { HearthMoney.Member(id: $0.id, name: $0.name) }
+        )
+    }
+
+    /// getDay: everything spent on one day, or a few days in a row, in HearthMoney's words (as
+    /// Ember says it). Without a year, the most recent one (October 10 asked in March means last
+    /// October).
+    func dayText(month: Int, day: Int, days: Int, now: Date = .now) -> String {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        var parts = DateComponents(year: calendar.component(.year, from: now), month: month, day: day)
+        guard var start = calendar.date(from: parts) else { return "That isn't a date." }
+        if start > today {
+            parts.year = (parts.year ?? 0) - 1
+            start = calendar.date(from: parts) ?? start
+        }
+        let end = calendar.date(byAdding: .day, value: max(days, 1), to: start) ?? start
+        let ask = HearthMoney.Ask(kind: .spending, span: HearthMoney.Span(start: start, end: end))
+        let reply = HearthMoney.answer(ask, book: book, now: now, calendar: calendar)
+        var lines = [reply.text]
+        // Income that day too, which spending leaves out.
+        let income = entries.filter { $0.kind == .income && $0.date >= start && $0.date < end }
+        for entry in income.prefix(4) { lines.append("Came in: \(entry.payee) +\(Money.text(entry.amountCents))") }
         return lines.joined(separator: "\n")
     }
 

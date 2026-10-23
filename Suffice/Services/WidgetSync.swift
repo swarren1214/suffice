@@ -23,6 +23,8 @@ enum WidgetSync {
         let snapshot = makeSnapshot(context, now: now)
         // BigTable shows the groceries budget on its grocery list.
         BigTableGroceries.publishBudget(snapshot.budgets, now: now)
+        // Ember answers money questions from Suffice's own numbers on this iPhone.
+        SufficeMoneyPublisher.publish(context, now: now)
         if WidgetStore.save(snapshot) {
             WidgetCenter.shared.reloadAllTimelines()
             // The watch app and its complications get the same numbers.

@@ -89,56 +89,34 @@ nonisolated struct BillDay: Hashable, Sendable, Identifiable {
 }
 
 /// The budget's arithmetic. Pure functions over snapshots, so every number on screen comes from
-/// here and is covered by tests.
+/// here and is covered by tests. Which budgets count, what's spent in each, and when bills come
+/// due and are paid live in HearthMoney (Services/Hearth, from ~/Developer/hearthkit), shared
+/// with Ember so both apps always agree; these call it.
 nonisolated enum BudgetMath {
     /// Whether a budget counts in `month`: started by then, and either repeating or a one-month
     /// budget for exactly that month. Archived budgets drop out.
     static func isActive(_ category: CategoryRecord, in month: MonthSpan, calendar: Calendar = .current) -> Bool {
-        guard !category.isArchived else { return false }
-        let starts = MonthSpan(containing: category.startMonth, calendar: calendar)
-        if category.startMonth > .distantPast, starts.start > month.start { return false }
-        if !category.repeatsMonthly, category.startMonth > .distantPast, starts != month { return false }
-        return true
+        HearthMoney.isActive(category.money, in: month.money, calendar: calendar)
     }
 
     /// Spending per category ID for entries in `month`. Income is ignored. Nil key = uncategorized.
     /// What a stash paid for doesn't count: it was planned, month by month, before it came.
     static func spentByCategory(_ entries: [EntryRecord], in month: MonthSpan) -> [UUID?: Int] {
-        var totals: [UUID?: Int] = [:]
-        for entry in entries where entry.kind == .expense && month.contains(entry.date) {
-            // A split charge counts each part toward its own budget.
-            for part in entry.spendingParts {
-                totals[part.categoryID, default: 0] += part.amountCents
-            }
-        }
-        return totals
+        HearthMoney.spentByCategory(entries.map(\.money), in: month.money)
     }
 
     /// The top-level budgets for `month`, each with its subcategories, in sort order. A budget
     /// that isn't active still shows if money was spent in it. A budget's amount is its own;
     /// subcategories needn't add up to it.
     static func statuses(_ categories: [CategoryRecord], entries: [EntryRecord], in month: MonthSpan, calendar: Calendar = .current) -> [CategoryStatus] {
-        let spent = spentByCategory(entries, in: month)
-        let sorted = categories.sorted { ($0.sortOrder, $0.name) < ($1.sortOrder, $1.name) }
-        let parents = sorted.filter { $0.parentID == nil }
-        return parents.compactMap { parent in
-            let kids = sorted.filter { $0.parentID == parent.id }
-            let children = kids.compactMap { child -> CategoryStatus? in
-                let childSpent = spent[child.id] ?? 0
-                guard isActive(child, in: month, calendar: calendar) || childSpent > 0 else { return nil }
-                return CategoryStatus(category: child, spentCents: childSpent, limitCents: isActive(child, in: month, calendar: calendar) ? child.limitCents : 0)
-            }
-            let ownSpent = spent[parent.id] ?? 0
-            let totalSpent = ownSpent + children.reduce(0) { $0 + $1.spentCents }
-            let active = isActive(parent, in: month, calendar: calendar)
-            guard active || totalSpent > 0 else { return nil }
-            // The budget's own amount; its subcategories split part or all of it. A budget
-            // with subcategories and no amount of its own (from before amounts came first)
-            // adds them up instead.
-            let childLimits = children.reduce(0) { $0 + $1.limitCents }
-            let limit = !active ? 0 : (parent.limitCents > 0 || children.isEmpty ? parent.limitCents : childLimits)
-            return CategoryStatus(category: parent, spentCents: totalSpent, limitCents: limit, children: children)
+        let byID = Dictionary(categories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        func convert(_ status: HearthMoney.Status) -> CategoryStatus? {
+            guard let category = byID[status.category.id] else { return nil }
+            return CategoryStatus(category: category, spentCents: status.spentCents, limitCents: status.limitCents,
+                                  children: status.children.compactMap(convert))
         }
+        return HearthMoney.statuses(categories.map(\.money), entries: entries.map(\.money), in: month.money, calendar: calendar)
+            .compactMap(convert)
     }
 
     /// The month's totals. `stashMoves` are the stash amounts counted (any month; only this
@@ -177,62 +155,14 @@ nonisolated enum BudgetMath {
 
     /// Every date `bill` comes due from `start` up to (not including) `end`, oldest first.
     static func occurrences(of bill: BillRecord, from start: Date, to end: Date, calendar: Calendar = .current) -> [Date] {
-        let from = calendar.startOfDay(for: start)
-        let hasStart = bill.startDate > .distantPast
-        let first = hasStart ? calendar.startOfDay(for: bill.startDate) : .distantPast
-        let last = bill.endDate.map { calendar.startOfDay(for: $0) }
-        let interval = max(bill.interval, 1)
-        var dates: [Date] = []
-
-        func keep(_ date: Date) -> Bool {
-            date >= from && date < end && date >= first && (last.map { date <= $0 } ?? true)
-        }
-
-        switch bill.frequency {
-        case .once:
-            if hasStart, keep(first) { dates.append(first) }
-
-        case .weekly:
-            // Weekly needs a first date to know the weekday; without one there's nothing to count.
-            guard hasStart else { break }
-            let step = 7 * interval
-            let daysIn = calendar.dateComponents([.day], from: first, to: from).day ?? 0
-            var index = max(0, daysIn / step)
-            while let date = calendar.date(byAdding: .day, value: index * step, to: first), date < end {
-                if keep(date) { dates.append(date) }
-                index += 1
-            }
-
-        case .monthly, .yearly:
-            let monthsPerStep = bill.frequency == .yearly ? 12 * interval : interval
-            // Old bills have no first date: they come due every month on their day.
-            let anchor = MonthSpan(containing: hasStart ? first : from, calendar: calendar)
-            let fromMonth = MonthSpan(containing: from, calendar: calendar)
-            let monthsIn = calendar.dateComponents([.month], from: anchor.start, to: fromMonth.start).month ?? 0
-            var index = max(0, monthsIn / monthsPerStep)
-            while true {
-                let month = anchor.offset(by: index * monthsPerStep, calendar: calendar)
-                guard month.start < end else { break }
-                let date = month.dueDate(day: bill.dueDay, calendar: calendar)
-                if keep(date) { dates.append(date) }
-                index += 1
-            }
-        }
-        return dates
+        HearthMoney.occurrences(of: bill.money, from: start, to: end, calendar: calendar)
     }
 
     /// The payment recorded for one due date of a bill, if there is one. A payment marks the due
     /// date it names; an older payment without one counts for its month.
     static func payment(for bill: BillRecord, dueOn due: Date, payments: [EntryRecord], calendar: Calendar = .current) -> EntryRecord? {
-        payments
-            .filter { entry in
-                guard entry.billID == bill.id else { return false }
-                if let paidFor = entry.billDueDate {
-                    return calendar.isDate(paidFor, inSameDayAs: due)
-                }
-                return calendar.isDate(entry.date, equalTo: due, toGranularity: .month)
-            }
-            .max { $0.date < $1.date }
+        guard let found = HearthMoney.payment(for: bill.money, dueOn: due, payments: payments.map(\.money), calendar: calendar) else { return nil }
+        return payments.first { $0.id == found.id }
     }
 
     /// Where one due date of a bill stands today.
