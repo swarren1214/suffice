@@ -1,0 +1,386 @@
+{
+  "accentHex" : "#3A7D34",
+  "ascAppID" : "",
+  "ascAppName" : "",
+  "inkHex" : "#2E6B2A",
+  "listings" : {
+
+  },
+  "live" : {
+
+  },
+  "locale" : "en-US",
+  "sets" : {
+    "duoOuter" : {
+      "captures" : [
+
+      ],
+      "devices" : [
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "1D4750B9-661F-47F8-83C4-1602EDC9ED81",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-f7e3c805",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 319,
+          "y" : 720
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "FA60A42D-9CC4-4611-8E4E-F6844AE20BD3",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-f7e3c805",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 1717,
+          "y" : 600
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "11B8FC17-A775-4CCA-BF30-38F2E8E4E557",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-f7e3c805",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 3115,
+          "y" : 600
+        }
+      ],
+      "frames" : [
+        {
+          "id" : "EE475AFA-BAD4-4A6A-885E-17237DC7A2B7",
+          "line1" : "Money talk,",
+          "line2" : "minus the tension.",
+          "look" : "accent",
+          "showIcon" : true,
+          "subhead" : "Plan the month together and never miss a bill."
+        },
+        {
+          "id" : "163A850B-2312-429A-940E-17FE5B742A32",
+          "line1" : "Every budget,",
+          "line2" : "at a glance.",
+          "look" : "tint",
+          "showIcon" : false,
+          "subhead" : "Plan a month, split it up, and see what’s left."
+        },
+        {
+          "id" : "E3ED3423-7E77-48DD-9107-D15329AA95F9",
+          "line1" : "Bills that remind you.",
+          "line2" : "Then file themselves.",
+          "look" : "accent",
+          "showIcon" : false,
+          "subhead" : "Due this week, subscriptions and overdue in one place."
+        }
+      ],
+      "layerGroups" : [
+
+      ],
+      "linked" : [
+        false,
+        false
+      ],
+      "publish" : false
+    },
+    "ipad" : {
+      "captures" : [
+
+      ],
+      "devices" : [
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPad-Air-13-inch-(M4)\/dark\/01-overview.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "6B2055D7-E6C6-4D49-8EBB-69FF1F832D20",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-b31c6a77",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 302,
+          "y" : 900
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPad-Air-13-inch-(M4)\/dark\/02-budget.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "7D4F5F1F-89F9-4DC3-AE9D-555677C0D464",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-b31c6a77",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 2366,
+          "y" : 760
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPad-Air-13-inch-(M4)\/dark\/03-budgetdetail.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "A8FA4925-3F79-4AB6-9964-BCCD7C710E5A",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-b31c6a77",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 4430,
+          "y" : 760
+        }
+      ],
+      "frames" : [
+        {
+          "id" : "E89EDF6D-D1D7-4FA2-AB53-298ECE113732",
+          "line1" : "Money talk,",
+          "line2" : "minus the tension.",
+          "look" : "accent",
+          "showIcon" : true,
+          "subhead" : "Plan the month together and never miss a bill."
+        },
+        {
+          "id" : "4DDFABD6-5BCA-4201-9F79-8CBD5C85E4BA",
+          "line1" : "Every budget,",
+          "line2" : "at a glance.",
+          "look" : "tint",
+          "showIcon" : false,
+          "subhead" : "Plan a month, split it up, and see what’s left."
+        },
+        {
+          "id" : "681D816D-B95D-4277-A4E1-92B175FEE233",
+          "line1" : "Bills that remind you.",
+          "line2" : "Then file themselves.",
+          "look" : "accent",
+          "showIcon" : false,
+          "subhead" : "Due this week, subscriptions and overdue in one place."
+        }
+      ],
+      "layerGroups" : [
+
+      ],
+      "linked" : [
+        false,
+        false
+      ],
+      "publish" : true
+    },
+    "iphone" : {
+      "captures" : [
+
+      ],
+      "devices" : [
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/01-overview.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "C7013D2F-D365-478A-B2DA-9AF21CB33AF4",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-5d6e7770",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 138,
+          "y" : 900
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/02-budget.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "13698714-EC5E-4400-9675-04F8DD60E3AA",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-5d6e7770",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 1458,
+          "y" : 740
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/04-activity.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "1AA92116-273F-424D-ABCD-D28B04B63FE2",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-5d6e7770",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 2778,
+          "y" : 740
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/05-transaction.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "44510616-501D-48AE-9B37-E1721C5DC734",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-5d6e7770",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 4098,
+          "y" : 740
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/06-bills.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "4E243D64-0C95-49D6-9E67-1E5195BDBAA5",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-5d6e7770",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 5418,
+          "y" : 740
+        }
+      ],
+      "frames" : [
+        {
+          "id" : "081C3240-2124-4D9B-8565-019644D32783",
+          "line1" : "Money talk,",
+          "line2" : "minus the tension.",
+          "look" : "accent",
+          "showIcon" : true,
+          "subhead" : "Plan the month together and never miss a bill."
+        },
+        {
+          "id" : "056D0CD2-9990-4D1F-BA81-88A9BBCA4704",
+          "line1" : "Every budget,",
+          "line2" : "at a glance.",
+          "look" : "tint",
+          "showIcon" : false,
+          "subhead" : "Plan a month, split it up, and see what’s left."
+        },
+        {
+          "id" : "4A7A5458-9D65-4466-AD9D-0B25BD260AB8",
+          "line1" : "Bills that remind you.",
+          "line2" : "Then file themselves.",
+          "look" : "accent",
+          "showIcon" : false,
+          "subhead" : "Due this week, subscriptions and overdue in one place."
+        },
+        {
+          "id" : "8E31BA80-F67D-4C1D-A1D5-AD683442C205",
+          "line1" : "Shared with your partner.",
+          "line2" : "Every dollar, both of you.",
+          "look" : "tint",
+          "showIcon" : false,
+          "subhead" : "Every transaction shows who made it."
+        },
+        {
+          "id" : "47593C05-C2F9-46BB-B924-316ECC5C6D45",
+          "line1" : "Ask Suffice.",
+          "line2" : "Get real answers.",
+          "look" : "accent",
+          "showIcon" : false,
+          "subhead" : "Worked out on your iPhone, from your own numbers."
+        }
+      ],
+      "layerGroups" : [
+
+      ],
+      "linked" : [
+        true,
+        false,
+        false,
+        false
+      ],
+      "publish" : true
+    },
+    "watch" : {
+      "captures" : [
+        "screenshots\/Apple-Watch-Series-12-(46mm)\/dark\/01-left.png",
+        "screenshots\/Apple-Watch-Series-12-(46mm)\/dark\/02-budgets.png",
+        "screenshots\/Apple-Watch-Series-12-(46mm)\/dark\/03-bills.png"
+      ],
+      "devices" : [
+
+      ],
+      "frames" : [
+
+      ],
+      "layerGroups" : [
+
+      ],
+      "linked" : [
+
+      ],
+      "publish" : true
+    }
+  },
+  "tintHex" : "#EBF3E9"
+}
