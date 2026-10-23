@@ -283,6 +283,8 @@ struct AppRoot: View {
         }
         // Widgets open suffice://overview, suffice://budget or suffice://bills.
         .onOpenURL { url in
+            // Household invitations (HearthInviteLink) open the join sheet.
+            if HearthInviteLink.open(url) { return }
             // A PDF or photo opened in Suffice (Share › Suffice, Open in Suffice): read it as a bill.
             if url.isFileURL {
                 guard let document = IncomingDocument.load(url) else { return }

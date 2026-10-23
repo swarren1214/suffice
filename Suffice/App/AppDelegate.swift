@@ -10,6 +10,12 @@ final class SufficeAppDelegate: NSObject, UIApplicationDelegate {
         return true
     }
 
+    /// CloudKit's silent push: someone changed the budget or the household.
+    nonisolated func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
+        await HearthHouseholdStore.shared.catchUp()
+        return .newData
+    }
+
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
         configuration.delegateClass = SufficeSceneDelegate.self
