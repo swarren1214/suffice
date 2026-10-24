@@ -1,16 +1,203 @@
 {
   "accentHex" : "#3A7D34",
-  "ascAppID" : "",
-  "ascAppName" : "",
+  "ascAppID" : "6822162465",
+  "ascAppName" : "Suffice: Personal Finance",
   "inkHex" : "#2E6B2A",
   "listings" : {
-
+    "en-US" : {
+      "description" : "Money talk, minus the tension.\n\nSuffice is a household budget you share with your partner. See every account's cash at a glance, every transaction with who made it, budgets split into subcategories, and the bills coming due. It all syncs between you through your own iCloud. There's no account to create and no server holding your ledger.\n\nBUDGETS AS RINGS\nPlan a month, split it into subcategories, and see what's left in each one at a glance.\n\nBILLS THAT REMIND\nSee what's due this week, your subscriptions and anything overdue. Mark a bill paid and it files itself.\n\nSHARED WITH YOUR PARTNER\nInvite your partner from Household. You both see the same budget, and every transaction shows who made it.\n\nASK SUFFICE\n\"How much did we spend eating out?\" Ask by voice or text and get an answer worked out on your iPhone, from your own numbers.\n\nPRIVATE BY DESIGN\nLock Suffice with Face ID, hide amounts on the Lock Screen, and export to CSV whenever you like. No ads, no tracking.\n\nON YOUR WRIST AND HOME SCREEN\nWidgets and an Apple Watch app keep what's left in sight.\n\nSUFFICE PLUS\nSuffice is free for everyday budgeting. Suffice Plus adds automatic bank sync, Ask Suffice and a debt payoff plan. Hearth+ unlocks the premium features in all five Hearth apps.\n\nPart of Hearth: five apps for the hard parts of everyday life.\n\nAsk Suffice needs an iPhone with Apple Intelligence.\n\nTerms of Use: https:\/\/hearthapps.com\/terms\/\nPrivacy Policy: https:\/\/hearthapps.com\/privacy\/",
+      "keywords" : "budget,household,couples,partner,bills,spending,expense tracker,money,shared,monthly,envelope,csv",
+      "marketingURL" : "https:\/\/hearthapps.com\/#suffice",
+      "name" : "Suffice: Personal Finance",
+      "promotionalText" : "Plan the month together, see what's left at a glance, and never miss a bill. Your budget lives in your own iCloud, not on our servers.",
+      "subtitle" : "Budgeting for families",
+      "supportURL" : "https:\/\/hearthapps.com\/support\/",
+      "whatsNew" : ""
+    }
   },
   "live" : {
-
+    "en-US" : {
+      "description" : "Money talk, minus the tension.\n\nSuffice is a household budget you share with your partner. See every account's cash at a glance, every transaction with who made it, budgets split into subcategories, and the bills coming due. It all syncs between you through your own iCloud. There's no account to create and no server holding your ledger.\n\nBUDGETS AS RINGS\nPlan a month, split it into subcategories, and see what's left in each one at a glance.\n\nBILLS THAT REMIND\nSee what's due this week, your subscriptions and anything overdue. Mark a bill paid and it files itself.\n\nSHARED WITH YOUR PARTNER\nInvite your partner from Household. You both see the same budget, and every transaction shows who made it.\n\nASK SUFFICE\n\"How much did we spend eating out?\" Ask by voice or text and get an answer worked out on your iPhone, from your own numbers.\n\nPRIVATE BY DESIGN\nLock Suffice with Face ID, hide amounts on the Lock Screen, and export to CSV whenever you like. No ads, no tracking.\n\nON YOUR WRIST AND HOME SCREEN\nWidgets and an Apple Watch app keep what's left in sight.\n\nSUFFICE PLUS\nSuffice is free for everyday budgeting. Suffice Plus adds automatic bank sync, Ask Suffice and a debt payoff plan. Hearth+ unlocks the premium features in all five Hearth apps.\n\nPart of Hearth: five apps for the hard parts of everyday life.\n\nAsk Suffice needs an iPhone with Apple Intelligence.\n\nTerms of Use: https:\/\/hearthapps.com\/terms\/\nPrivacy Policy: https:\/\/hearthapps.com\/privacy\/",
+      "keywords" : "budget,household,couples,partner,bills,spending,expense tracker,money,shared,monthly,envelope,csv",
+      "marketingURL" : "https:\/\/hearthapps.com\/#suffice",
+      "name" : "Suffice: Personal Finance",
+      "promotionalText" : "Plan the month together, see what's left at a glance, and never miss a bill. Your budget lives in your own iCloud, not on our servers.",
+      "subtitle" : "Budgeting for families",
+      "supportURL" : "https:\/\/hearthapps.com\/support\/",
+      "whatsNew" : ""
+    }
   },
+  "liveLoaded" : 814504239.410324,
   "locale" : "en-US",
   "sets" : {
+    "artHeader" : {
+      "captures" : [
+
+      ],
+      "devices" : [
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/01-overview.png",
+          "flipped" : false,
+          "groupID" : "D952F2F3-7F7C-4BEC-BFB6-3824112642B8",
+          "hidden" : false,
+          "id" : "F60D5E28-F176-4DC4-B9D7-C7A5FFD506D9",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-f6bcd037",
+          "rotation" : 0,
+          "scale" : 1.5868051020127742,
+          "shadow" : true,
+          "x" : 1606,
+          "y" : 341
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/02-budget.png",
+          "flipped" : false,
+          "groupID" : "D952F2F3-7F7C-4BEC-BFB6-3824112642B8",
+          "hidden" : false,
+          "id" : "0ADF03CF-FF72-4574-8799-F65FE1ABBBB4",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-f6bcd037",
+          "rotation" : 0,
+          "scale" : 1.8014096265771122,
+          "shadow" : true,
+          "x" : 2517,
+          "y" : 462
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/06-bills.png",
+          "flipped" : false,
+          "groupID" : "D952F2F3-7F7C-4BEC-BFB6-3824112642B8",
+          "hidden" : false,
+          "id" : "7FA7AC5B-E1F5-41CC-AD89-DA8C1C5B717B",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-f6bcd037",
+          "rotation" : 0,
+          "scale" : 1.8901497118467723,
+          "shadow" : true,
+          "x" : 2067,
+          "y" : 25
+        }
+      ],
+      "frames" : [
+        {
+          "id" : "F4475CE6-1987-484E-95A8-1E6602B08669",
+          "line1" : "Money talk,",
+          "line2" : "minus the tension.",
+          "look" : "accent",
+          "showIcon" : false,
+          "subhead" : ""
+        }
+      ],
+      "layerGroups" : [
+        {
+          "id" : "D952F2F3-7F7C-4BEC-BFB6-3824112642B8",
+          "name" : "Group 1"
+        }
+      ],
+      "linked" : [
+
+      ],
+      "publish" : true
+    },
+    "artSearch" : {
+      "captures" : [
+
+      ],
+      "devices" : [
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/01-overview.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "44E0F9BF-1DD6-40EE-8D21-4A1E5A95496A",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-f6bcd037",
+          "rotation" : 0,
+          "scale" : 1.9270638416783026,
+          "shadow" : true,
+          "x" : 1596.4314803244897,
+          "y" : 581.9999999999999
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/02-budget.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "057E026E-1A41-4724-A638-E8E5F8EC7090",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-f6bcd037",
+          "rotation" : 0,
+          "scale" : 1.9855162474480224,
+          "shadow" : true,
+          "x" : 2790,
+          "y" : 829
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/06-bills.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "A27E6D08-3B8D-4138-8477-262F51B3EBB1",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-f6bcd037",
+          "rotation" : 0,
+          "scale" : 2.15,
+          "shadow" : true,
+          "x" : 2240,
+          "y" : 170
+        }
+      ],
+      "frames" : [
+        {
+          "id" : "D1F5DCC4-9E26-4CA7-BF8A-BBAAC4EBBECB",
+          "line1" : "Money talk,",
+          "line2" : "minus the tension.",
+          "look" : "tint",
+          "showIcon" : true,
+          "subhead" : "Plan the month together and never miss a bill."
+        }
+      ],
+      "layerGroups" : [
+
+      ],
+      "linked" : [
+
+      ],
+      "publish" : true
+    },
     "duoOuter" : {
       "captures" : [
 
@@ -22,18 +209,18 @@
           "capture" : "",
           "flipped" : false,
           "hidden" : false,
-          "id" : "1D4750B9-661F-47F8-83C4-1602EDC9ED81",
+          "id" : "F81D0CA0-BDC2-472D-9C0C-E6494CAABE1A",
           "imagePath" : "",
           "kind" : "device",
           "locked" : false,
           "name" : "",
           "opacity" : 1,
-          "renderID" : "render-f7e3c805",
+          "renderID" : "render-13c1dea3",
           "rotation" : 0,
-          "scale" : 1,
+          "scale" : 1.977205539639103,
           "shadow" : true,
-          "x" : 319,
-          "y" : 720
+          "x" : 140,
+          "y" : 639
         },
         {
           "aspect" : 1,
@@ -41,7 +228,7 @@
           "capture" : "",
           "flipped" : false,
           "hidden" : false,
-          "id" : "FA60A42D-9CC4-4611-8E4E-F6844AE20BD3",
+          "id" : "01C86C66-8EAE-46EE-8B7D-BF4AEDCFCDFD",
           "imagePath" : "",
           "kind" : "device",
           "locked" : false,
@@ -51,8 +238,8 @@
           "rotation" : 0,
           "scale" : 1,
           "shadow" : true,
-          "x" : 1717,
-          "y" : 600
+          "x" : 1857,
+          "y" : 544
         },
         {
           "aspect" : 1,
@@ -60,7 +247,7 @@
           "capture" : "",
           "flipped" : false,
           "hidden" : false,
-          "id" : "11B8FC17-A775-4CCA-BF30-38F2E8E4E557",
+          "id" : "24DFC0D1-AAD3-486E-9600-21FCC0415F44",
           "imagePath" : "",
           "kind" : "device",
           "locked" : false,
@@ -68,15 +255,15 @@
           "opacity" : 1,
           "renderID" : "render-f7e3c805",
           "rotation" : 0,
-          "scale" : 1,
+          "scale" : 1.2512193589706353,
           "shadow" : true,
-          "x" : 3115,
-          "y" : 600
+          "x" : 3020,
+          "y" : 520
         }
       ],
       "frames" : [
         {
-          "id" : "EE475AFA-BAD4-4A6A-885E-17237DC7A2B7",
+          "id" : "7817C267-7B1F-4444-8430-69634B18B0D5",
           "line1" : "Money talk,",
           "line2" : "minus the tension.",
           "look" : "accent",
@@ -84,7 +271,7 @@
           "subhead" : "Plan the month together and never miss a bill."
         },
         {
-          "id" : "163A850B-2312-429A-940E-17FE5B742A32",
+          "id" : "AF27CCA2-F96E-443E-A653-FDCA34209386",
           "line1" : "Every budget,",
           "line2" : "at a glance.",
           "look" : "tint",
@@ -92,10 +279,10 @@
           "subhead" : "Plan a month, split it up, and see what’s left."
         },
         {
-          "id" : "E3ED3423-7E77-48DD-9107-D15329AA95F9",
+          "id" : "8BE2924B-409F-4A3D-986E-789B37FEF187",
           "line1" : "Bills that remind you.",
           "line2" : "Then file themselves.",
-          "look" : "accent",
+          "look" : "tint",
           "showIcon" : false,
           "subhead" : "Due this week, subscriptions and overdue in one place."
         }
@@ -104,7 +291,7 @@
 
       ],
       "linked" : [
-        false,
+        true,
         false
       ],
       "publish" : false
@@ -120,18 +307,18 @@
           "capture" : "screenshots\/iPad-Air-13-inch-(M4)\/dark\/01-overview.png",
           "flipped" : false,
           "hidden" : false,
-          "id" : "6B2055D7-E6C6-4D49-8EBB-69FF1F832D20",
+          "id" : "A80765F7-E3CC-4435-9F29-155946735A55",
           "imagePath" : "",
           "kind" : "device",
           "locked" : false,
           "name" : "",
           "opacity" : 1,
-          "renderID" : "render-b31c6a77",
+          "renderID" : "render-d9393411",
           "rotation" : 0,
-          "scale" : 1,
+          "scale" : 1.329356931626691,
           "shadow" : true,
-          "x" : 302,
-          "y" : 900
+          "x" : 419,
+          "y" : 765
         },
         {
           "aspect" : 1,
@@ -139,18 +326,18 @@
           "capture" : "screenshots\/iPad-Air-13-inch-(M4)\/dark\/02-budget.png",
           "flipped" : false,
           "hidden" : false,
-          "id" : "7D4F5F1F-89F9-4DC3-AE9D-555677C0D464",
+          "id" : "78B5A8E3-0932-4833-B012-F562D41B1BBC",
           "imagePath" : "",
           "kind" : "device",
           "locked" : false,
           "name" : "",
           "opacity" : 1,
-          "renderID" : "render-b31c6a77",
+          "renderID" : "render-261559ba",
           "rotation" : 0,
-          "scale" : 1,
+          "scale" : 1.3029918214678682,
           "shadow" : true,
-          "x" : 2366,
-          "y" : 760
+          "x" : 4209,
+          "y" : 610
         },
         {
           "aspect" : 1,
@@ -158,23 +345,23 @@
           "capture" : "screenshots\/iPad-Air-13-inch-(M4)\/dark\/03-budgetdetail.png",
           "flipped" : false,
           "hidden" : false,
-          "id" : "A8FA4925-3F79-4AB6-9964-BCCD7C710E5A",
+          "id" : "B899909D-71D2-4A7B-A16D-E847A7FC4656",
           "imagePath" : "",
           "kind" : "device",
           "locked" : false,
           "name" : "",
           "opacity" : 1,
-          "renderID" : "render-b31c6a77",
+          "renderID" : "render-d9393411",
           "rotation" : 0,
-          "scale" : 1,
+          "scale" : 1.4471402955943038,
           "shadow" : true,
-          "x" : 4430,
-          "y" : 760
+          "x" : 1876,
+          "y" : 608
         }
       ],
       "frames" : [
         {
-          "id" : "E89EDF6D-D1D7-4FA2-AB53-298ECE113732",
+          "id" : "BD450791-89A2-4A88-AA3E-0F0CC468B9D2",
           "line1" : "Money talk,",
           "line2" : "minus the tension.",
           "look" : "accent",
@@ -182,7 +369,7 @@
           "subhead" : "Plan the month together and never miss a bill."
         },
         {
-          "id" : "4DDFABD6-5BCA-4201-9F79-8CBD5C85E4BA",
+          "id" : "FD644E91-1AF9-4D7F-ACD6-57286B40A5AE",
           "line1" : "Every budget,",
           "line2" : "at a glance.",
           "look" : "tint",
@@ -190,10 +377,10 @@
           "subhead" : "Plan a month, split it up, and see what’s left."
         },
         {
-          "id" : "681D816D-B95D-4277-A4E1-92B175FEE233",
+          "id" : "FB85CBAA-9186-4515-9E2E-191CF9CB3F40",
           "line1" : "Bills that remind you.",
           "line2" : "Then file themselves.",
-          "look" : "accent",
+          "look" : "tint",
           "showIcon" : false,
           "subhead" : "Due this week, subscriptions and overdue in one place."
         }
@@ -202,7 +389,7 @@
 
       ],
       "linked" : [
-        false,
+        true,
         false
       ],
       "publish" : true
@@ -218,18 +405,18 @@
           "capture" : "screenshots\/iPhone-18-Pro\/dark\/01-overview.png",
           "flipped" : false,
           "hidden" : false,
-          "id" : "C7013D2F-D365-478A-B2DA-9AF21CB33AF4",
+          "id" : "8C7AB27D-10C7-4B42-B198-ACD0BD798B17",
           "imagePath" : "",
           "kind" : "device",
           "locked" : false,
           "name" : "",
           "opacity" : 1,
-          "renderID" : "render-5d6e7770",
+          "renderID" : "render-f6bcd037",
           "rotation" : 0,
-          "scale" : 1,
+          "scale" : 1.85,
           "shadow" : true,
-          "x" : 138,
-          "y" : 900
+          "x" : 787,
+          "y" : 746
         },
         {
           "aspect" : 1,
@@ -237,56 +424,18 @@
           "capture" : "screenshots\/iPhone-18-Pro\/dark\/02-budget.png",
           "flipped" : false,
           "hidden" : false,
-          "id" : "13698714-EC5E-4400-9675-04F8DD60E3AA",
+          "id" : "55BA2AF6-E30A-4646-8AB5-31D4DDC4FEC1",
           "imagePath" : "",
           "kind" : "device",
           "locked" : false,
           "name" : "",
           "opacity" : 1,
-          "renderID" : "render-5d6e7770",
+          "renderID" : "render-f6bcd037",
           "rotation" : 0,
-          "scale" : 1,
+          "scale" : 1.85,
           "shadow" : true,
-          "x" : 1458,
-          "y" : 740
-        },
-        {
-          "aspect" : 1,
-          "baseWidth" : 0,
-          "capture" : "screenshots\/iPhone-18-Pro\/dark\/04-activity.png",
-          "flipped" : false,
-          "hidden" : false,
-          "id" : "1AA92116-273F-424D-ABCD-D28B04B63FE2",
-          "imagePath" : "",
-          "kind" : "device",
-          "locked" : false,
-          "name" : "",
-          "opacity" : 1,
-          "renderID" : "render-5d6e7770",
-          "rotation" : 0,
-          "scale" : 1,
-          "shadow" : true,
-          "x" : 2778,
-          "y" : 740
-        },
-        {
-          "aspect" : 1,
-          "baseWidth" : 0,
-          "capture" : "screenshots\/iPhone-18-Pro\/dark\/05-transaction.png",
-          "flipped" : false,
-          "hidden" : false,
-          "id" : "44510616-501D-48AE-9B37-E1721C5DC734",
-          "imagePath" : "",
-          "kind" : "device",
-          "locked" : false,
-          "name" : "",
-          "opacity" : 1,
-          "renderID" : "render-5d6e7770",
-          "rotation" : 0,
-          "scale" : 1,
-          "shadow" : true,
-          "x" : 4098,
-          "y" : 740
+          "x" : -188,
+          "y" : 732
         },
         {
           "aspect" : 1,
@@ -294,23 +443,42 @@
           "capture" : "screenshots\/iPhone-18-Pro\/dark\/06-bills.png",
           "flipped" : false,
           "hidden" : false,
-          "id" : "4E243D64-0C95-49D6-9E67-1E5195BDBAA5",
+          "id" : "43521C93-BEA8-45F0-AEE9-A5FDA39086F0",
           "imagePath" : "",
           "kind" : "device",
           "locked" : false,
           "name" : "",
           "opacity" : 1,
-          "renderID" : "render-5d6e7770",
+          "renderID" : "render-041fceb4",
           "rotation" : 0,
           "scale" : 1,
           "shadow" : true,
-          "x" : 5418,
-          "y" : 740
+          "x" : 2778,
+          "y" : 617
+        },
+        {
+          "aspect" : 1,
+          "baseWidth" : 0,
+          "capture" : "screenshots\/iPhone-18-Pro\/dark\/05-transaction.png",
+          "flipped" : false,
+          "hidden" : false,
+          "id" : "B3C529CE-CF99-452C-8AC8-60552F683E0E",
+          "imagePath" : "",
+          "kind" : "device",
+          "locked" : false,
+          "name" : "",
+          "opacity" : 1,
+          "renderID" : "render-4d02fad1",
+          "rotation" : 0,
+          "scale" : 1,
+          "shadow" : true,
+          "x" : 4098,
+          "y" : 484
         }
       ],
       "frames" : [
         {
-          "id" : "081C3240-2124-4D9B-8565-019644D32783",
+          "id" : "66F71C46-F5EB-4278-AF2F-8237F044860D",
           "line1" : "Money talk,",
           "line2" : "minus the tension.",
           "look" : "accent",
@@ -318,7 +486,7 @@
           "subhead" : "Plan the month together and never miss a bill."
         },
         {
-          "id" : "056D0CD2-9990-4D1F-BA81-88A9BBCA4704",
+          "id" : "2028FEBF-8E4F-4388-B075-DB5BF96809CE",
           "line1" : "Every budget,",
           "line2" : "at a glance.",
           "look" : "tint",
@@ -326,28 +494,20 @@
           "subhead" : "Plan a month, split it up, and see what’s left."
         },
         {
-          "id" : "4A7A5458-9D65-4466-AD9D-0B25BD260AB8",
+          "id" : "D7BF0B03-2645-433E-8C99-CBB84E190B29",
           "line1" : "Bills that remind you.",
           "line2" : "Then file themselves.",
-          "look" : "accent",
+          "look" : "tint",
           "showIcon" : false,
           "subhead" : "Due this week, subscriptions and overdue in one place."
         },
         {
-          "id" : "8E31BA80-F67D-4C1D-A1D5-AD683442C205",
-          "line1" : "Shared with your partner.",
-          "line2" : "Every dollar, both of you.",
+          "id" : "E0C8B82E-9F50-4EA1-8762-71D427792688",
+          "line1" : "Budget together.",
+          "line2" : "Track every dollar.",
           "look" : "tint",
           "showIcon" : false,
           "subhead" : "Every transaction shows who made it."
-        },
-        {
-          "id" : "47593C05-C2F9-46BB-B924-316ECC5C6D45",
-          "line1" : "Ask Suffice.",
-          "line2" : "Get real answers.",
-          "look" : "accent",
-          "showIcon" : false,
-          "subhead" : "Worked out on your iPhone, from your own numbers."
         }
       ],
       "layerGroups" : [
@@ -355,7 +515,6 @@
       ],
       "linked" : [
         true,
-        false,
         false,
         false
       ],
