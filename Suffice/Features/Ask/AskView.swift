@@ -238,14 +238,10 @@ struct AskView: View {
                         speaker.stop()
                         showsVoice = true
                     } label: {
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: 17, weight: .semibold))
-                            .frame(width: Self.buttonSize, height: Self.buttonSize)
-                            .contentShape(.circle)
+                        // The Hearth assistant's orb, as in Ember: tap to talk.
+                        HearthOrbButtonLabel(size: Self.buttonSize)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.white)
-                    .background(Brand.green, in: .circle)
                     .padding(.bottom, (Self.composerHeight - Self.buttonSize) / 2)
                     .disabled(engine.availability != .available)
                     .opacity(engine.availability == .available ? 1 : 0.5)
@@ -438,21 +434,10 @@ struct AskBubble: View {
 
 /// "Checking your budgets…" with three dots that pulse in turn.
 private struct ThinkingBubble: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         HStack {
-            HStack(spacing: 8) {
-                TimelineView(.animation(paused: reduceMotion)) { timeline in
-                    let phase = reduceMotion ? 0 : Int(timeline.date.timeIntervalSinceReferenceDate * 3) % 3
-                    HStack(spacing: 4) {
-                        ForEach(0..<3, id: \.self) { index in
-                            Circle()
-                                .fill(Color(.systemGray3).opacity(index == phase ? 1 : 0.45))
-                                .frame(width: 7, height: 7)
-                        }
-                    }
-                }
+            HStack(spacing: 10) {
+                HearthOrb(mode: .thinking, size: 24)
                 Text("Checking your budgets…")
                     .font(.subheadline)
                     .foregroundStyle(Brand.secondaryText)

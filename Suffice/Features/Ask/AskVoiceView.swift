@@ -32,11 +32,10 @@ struct AskVoiceView: View {
 
     var body: some View {
         ZStack {
-            ListeningGlow(active: conversation.isListening, level: conversation.level)
-
             VStack(alignment: .leading, spacing: 0) {
                 topBar
-                Spacer(minLength: 24)
+                Spacer(minLength: 12)
+                orb
                 LiveTranscript(
                     heading: heading,
                     text: conversation.isListening ? conversation.transcript : conversation.question,
@@ -66,6 +65,54 @@ struct AskVoiceView: View {
         }
         .sheet(item: $openedBudget) { category in
             BudgetSheet(category: category, month: MonthSpan(containing: .now))
+        }
+    }
+
+    // MARK: The orb (HearthKit's HearthOrb, as in Ember)
+
+    /// What the orb shows: it listens, swells with the voice, swirls while thinking and pulses
+    /// while Suffice talks.
+    private var orbMode: HearthOrb.Mode {
+        switch conversation.phase {
+        case .starting, .listening: .listening
+        case .thinking: .thinking
+        case .speaking: .speaking
+        case .paused, .failed: .idle
+        }
+    }
+
+    /// An answer is on screen: the orb steps back to make room.
+    private var showsAnswer: Bool { reply != nil && conversation.phase != .thinking }
+
+    /// Tapping the orb does the obvious thing: sends what was said, stops Suffice talking, or
+    /// turns the microphone back on.
+    private var orb: some View {
+        Button {
+            switch conversation.phase {
+            case .listening where !conversation.transcript.isEmpty: conversation.finishSpeaking()
+            case .thinking, .speaking: conversation.interrupt()
+            case .paused, .failed: Task { await conversation.resume() }
+            default: break
+            }
+        } label: {
+            HearthOrb(mode: orbMode, size: 180, level: conversation.level)
+                .padding(20)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(showsAnswer ? 0.6 : 1)
+        .frame(height: showsAnswer ? 132 : 224)
+        .frame(maxWidth: .infinity)
+        .animation(.smooth(duration: 0.5), value: showsAnswer)
+        .accessibilityLabel(orbLabel)
+    }
+
+    private var orbLabel: String {
+        switch conversation.phase {
+        case .listening: conversation.transcript.isEmpty ? "Suffice is listening" : "Send"
+        case .thinking, .speaking: "Stop Suffice"
+        case .paused, .failed: "Turn the microphone on"
+        case .starting: "Suffice"
         }
     }
 
@@ -124,8 +171,6 @@ struct AskVoiceView: View {
             .frame(maxWidth: .infinity, minHeight: 64)
         case .listening:
             VStack(spacing: 12) {
-                Waveform(level: conversation.level)
-                    .frame(height: 48)
                 HStack {
                     Text(conversation.transcript.isEmpty
                          ? "Listening… Suffice answers when you pause."
@@ -146,7 +191,6 @@ struct AskVoiceView: View {
             }
         case .thinking:
             HStack(spacing: 12) {
-                ProgressView()
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Checking your budgets…")
                     Text("Keep talking to change your question.")

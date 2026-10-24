@@ -212,13 +212,18 @@ enum Reminders {
 nonisolated final class ReminderDelegate: NSObject, UNUserNotificationCenterDelegate {
     static let shared = ReminderDelegate()
 
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+    // Completion-handler forms: they must be called on the main thread, which an async
+    // delegate method doesn't promise (that crashed Caloma whenever a notification was tapped).
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .list, .sound])
     }
 
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let tab = response.notification.request.content.userInfo["tab"] as? String
-        await MainActor.run {
+        let done = MainThreadCompletion<Void> { _ in completionHandler() }
+        DispatchQueue.main.async {
+            defer { done.run(()) }
+            MainActor.assumeIsolated {
             let router = AppRouter.shared
             switch tab {
             case "bills": router.tab = .bills
@@ -226,6 +231,15 @@ nonisolated final class ReminderDelegate: NSObject, UNUserNotificationCenterDele
             default: router.tab = .overview
             }
             router.showThisMonth()
+            }
         }
     }
 }
+
+/// A notification delegate's completion handler, carried to the main queue to be called there.
+private nonisolated final class MainThreadCompletion<Value>: @unchecked Sendable {
+    private let completion: (Value) -> Void
+    init(_ completion: @escaping (Value) -> Void) { self.completion = completion }
+    func run(_ value: Value) { completion(value) }
+}
+
